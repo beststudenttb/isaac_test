@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+data_isaac/
+IsaacLab/logs/
+IsaacLab/outputs/
+*.typ
+*.pdf
+*.doc
+*.docx
