@@ -2,7 +2,7 @@
 
 Run from the project directory:
 
-    ./IsaacLab/isaaclab.sh -p export_robot_usd.py
+    ./IsaacLab/isaaclab.sh -p scripts/export_robot_usd.py
 """
 
 import argparse
@@ -11,7 +11,7 @@ import os
 
 from isaaclab.app import AppLauncher
 
-ROBOT_USD = "./ball_robot.usd"
+ROBOT_USD = "./assets/robots/ball_robot.usd"
 EYE_PITCH_DEG = 15.0
 
 parser = argparse.ArgumentParser(description="Export the ball robot USD.")

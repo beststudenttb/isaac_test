@@ -2,7 +2,7 @@
 
 Run from the project directory:
 
-    ./IsaacLab/isaaclab.sh -p robot_preview.py
+    ./IsaacLab/isaaclab.sh -p scripts/robot_preview.py
 """
 
 import argparse
@@ -22,7 +22,7 @@ ROBOT_Z = 0.5
 FLOAT_AMP = 0.01
 FLOAT_PERIOD = 0.5
 HEAD_W = math.pi / 4.0
-ROBOT_USD = "./ball_robot.usd"
+ROBOT_USD = "./assets/robots/ball_robot.usd"
 
 parser = argparse.ArgumentParser(description="Preview the simple ball robot.")
 AppLauncher.add_app_launcher_args(parser)

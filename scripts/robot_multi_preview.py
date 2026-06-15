@@ -2,7 +2,7 @@
 
 Run from the project directory:
 
-    ./IsaacLab/isaaclab.sh -p robot_multi_preview.py --num-envs 64
+    ./IsaacLab/isaaclab.sh -p scripts/robot_multi_preview.py --num-envs 64
 """
 
 import argparse

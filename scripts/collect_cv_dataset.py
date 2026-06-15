@@ -2,7 +2,7 @@
 
 Run from the project directory:
 
-    ./IsaacLab/isaaclab.sh -p collect_cv_dataset.py --num-envs 64 --samples 10000
+    ./IsaacLab/isaaclab.sh -p scripts/collect_cv_dataset.py --num-envs 64 --samples 10000
 """
 
 import argparse
@@ -14,7 +14,7 @@ from pathlib import Path
 
 from isaaclab.app import AppLauncher
 
-ROBOT_USD = "./ball_robot.usd"
+ROBOT_USD = "./assets/robots/ball_robot.usd"
 OUT_DIR = "./data_isaac"
 SPLITS = ("train", "test", "val")
 SPLIT_PROBS = (0.7, 0.2, 0.1)
@@ -42,7 +42,7 @@ parser.add_argument("--visible-only", action="store_true")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 args_cli.enable_cameras = True
-args_cli.rendering_mode = "performance"
+args_cli.rendering_mode = "quality"
 args_cli.headless = True
 args_cli.livestream = 0
 
@@ -215,96 +215,102 @@ def main():
     dirs = make_dirs(Path(args_cli.out_dir))
     meta_files = {}
     meta_writers = {}
-    for split in SPLITS:
-        meta_path = Path(args_cli.out_dir) / split / "meta.csv"
-        meta_files[split] = meta_path.open("w", newline="", encoding="utf-8")
-        meta_writers[split] = csv.DictWriter(
-            meta_files[split],
-            fieldnames=["index", "env_id", "px_x", "x_norm", "dist", "angle_deg", "target_x", "target_y", "visible"],
+    try:
+        for split in SPLITS:
+            meta_path = Path(args_cli.out_dir) / split / "meta.csv"
+            meta_files[split] = meta_path.open("w", newline="", encoding="utf-8")
+            meta_writers[split] = csv.DictWriter(
+                meta_files[split],
+                fieldnames=["index", "env_id", "px_x", "x_norm", "dist", "angle_deg", "target_x", "target_y", "visible"],
+            )
+            meta_writers[split].writeheader()
+
+        rng = np.random.default_rng(int(args_cli.seed))
+        render_cfg = sim_utils.RenderCfg(rendering_mode="quality")
+        sim_cfg = sim_utils.SimulationCfg(dt=0.04, device=args_cli.device, render=render_cfg)
+        sim = SimulationContext(sim_cfg)
+        camera, target_ops, env_origins = design_scene()
+        sim.reset()
+        camera.reset()
+        for _ in range(5):
+            sim.step()
+            camera.update(sim.get_physics_dt())
+
+        total = int(args_cli.samples)
+        num_envs = int(args_cli.num_envs)
+        split_count = {split: 0 for split in SPLITS}
+        saved = 0
+        frames = 0
+        last_time = time.perf_counter()
+        print(
+            f"[INFO] collect start samples={total} envs={num_envs} split_prob=train/test/val={SPLIT_PROBS} "
+            f"res={IMAGE_WIDTH}x{IMAGE_HEIGHT} fov_x={FOV_X_DEG:.1f} angle=+/-{ANGLE_DEG:.1f} "
+            f"dist={DIST_MIN:.1f}-{DIST_MAX:.1f}m out={args_cli.out_dir} clear_existing=1"
         )
-        meta_writers[split].writeheader()
 
-    rng = np.random.default_rng(int(args_cli.seed))
-    render_cfg = sim_utils.RenderCfg(rendering_mode="performance")
-    sim_cfg = sim_utils.SimulationCfg(dt=0.04, device=args_cli.device, render=render_cfg)
-    sim = SimulationContext(sim_cfg)
-    camera, target_ops, env_origins = design_scene()
-    sim.reset()
-    camera.reset()
-    for _ in range(5):
-        sim.step()
-        camera.update(sim.get_physics_dt())
+        while simulation_app.is_running() and saved < total:
+            batch = []
+            for op in target_ops:
+                forward, lateral, dist, angle = sample_target(rng)
+                op.Set(Gf.Vec3d(forward, lateral, TARGET_RADIUS))
+                batch.append((forward, lateral, dist, angle))
 
-    total = int(args_cli.samples)
-    num_envs = int(args_cli.num_envs)
-    split_index = {split: 0 for split in SPLITS}
-    split_count = {split: 0 for split in SPLITS}
-    saved = 0
-    frames = 0
-    last_time = time.perf_counter()
-    print(
-        f"[INFO] collect start samples={total} envs={num_envs} split_prob=train/test/val={SPLIT_PROBS} "
-        f"res={IMAGE_WIDTH}x{IMAGE_HEIGHT} fov_x={FOV_X_DEG:.1f} angle=+/-{ANGLE_DEG:.1f} "
-        f"dist={DIST_MIN:.1f}-{DIST_MAX:.1f}m out={args_cli.out_dir} clear_existing=1"
-    )
+            sim.step()
+            camera.update(sim.get_physics_dt())
+            images = camera.data.output["rgb"]
+            cam_pos = camera.data.pos_w.cpu().numpy()
+            cam_quat = camera.data.quat_w_world.cpu().numpy()
+            intrinsics = camera.data.intrinsic_matrices.cpu().numpy()
+            count = min(num_envs, total - saved)
+            for env_id in range(count):
+                forward, lateral, dist, angle = batch[env_id]
+                env_x, env_y, env_z = env_origins[env_id]
+                target_pos = np.array([env_x + forward, env_y + lateral, env_z + TARGET_RADIUS], dtype=np.float64)
+                label = label_from_camera(cam_pos[env_id], cam_quat[env_id], intrinsics[env_id], target_pos, dist)
+                if bool(args_cli.visible_only) and not label[4]:
+                    continue
+                split = choose_split(rng)
+                img_dir, label_dir = dirs[split]
+                sample_index = saved
+                save_sample(img_dir, label_dir, sample_index, images[env_id], label)
+                px_x, x_norm, label_dist, _dist_bin, visible = label
+                meta_writers[split].writerow(
+                    {
+                        "index": sample_index,
+                        "env_id": env_id,
+                        "px_x": f"{px_x:.6f}",
+                        "x_norm": f"{x_norm:.6f}",
+                        "dist": f"{dist:.6f}",
+                        "angle_deg": f"{math.degrees(angle):.6f}",
+                        "target_x": f"{forward:.6f}",
+                        "target_y": f"{lateral:.6f}",
+                        "visible": visible,
+                    }
+                )
+                split_count[split] += 1
+                saved += 1
 
-    while simulation_app.is_running() and saved < total:
-        batch = []
-        for op in target_ops:
-            forward, lateral, dist, angle = sample_target(rng)
-            op.Set(Gf.Vec3d(forward, lateral, TARGET_RADIUS))
-            batch.append((forward, lateral, dist, angle))
+            frames += 1
+            now = time.perf_counter()
+            if now - last_time >= 1.0:
+                print(
+                    f"[INFO] saved={saved}/{total} train={split_count['train']} test={split_count['test']} "
+                    f"val={split_count['val']} render_fps={frames / (now - last_time):.1f}"
+                )
+                frames = 0
+                last_time = now
 
-        sim.step()
-        camera.update(sim.get_physics_dt())
-        images = camera.data.output["rgb"]
-        cam_pos = camera.data.pos_w.cpu().numpy()
-        cam_quat = camera.data.quat_w_world.cpu().numpy()
-        intrinsics = camera.data.intrinsic_matrices.cpu().numpy()
-        count = min(num_envs, total - saved)
-        for env_id in range(count):
-            forward, lateral, dist, angle = batch[env_id]
-            env_x, env_y, env_z = env_origins[env_id]
-            target_pos = np.array([env_x + forward, env_y + lateral, env_z + TARGET_RADIUS], dtype=np.float64)
-            label = label_from_camera(cam_pos[env_id], cam_quat[env_id], intrinsics[env_id], target_pos, dist)
-            if bool(args_cli.visible_only) and not label[4]:
-                continue
-            split = choose_split(rng)
-            img_dir, label_dir = dirs[split]
-            sample_index = split_index[split]
-            save_sample(img_dir, label_dir, sample_index, images[env_id], label)
-            px_x, x_norm, label_dist, _dist_bin, visible = label
-            meta_writers[split].writerow(
-                {
-                    "index": sample_index,
-                    "env_id": env_id,
-                    "px_x": f"{px_x:.6f}",
-                    "x_norm": f"{x_norm:.6f}",
-                    "dist": f"{dist:.6f}",
-                    "angle_deg": f"{math.degrees(angle):.6f}",
-                    "target_x": f"{forward:.6f}",
-                    "target_y": f"{lateral:.6f}",
-                    "visible": visible,
-                }
-            )
-            split_index[split] += 1
-            split_count[split] += 1
-            saved += 1
-
-        frames += 1
-        now = time.perf_counter()
-        if now - last_time >= 1.0:
-            print(
-                f"[INFO] saved={saved}/{total} train={split_count['train']} test={split_count['test']} "
-                f"val={split_count['val']} render_fps={frames / (now - last_time):.1f}"
-            )
-            frames = 0
-            last_time = now
-
-    for meta_file in meta_files.values():
-        meta_file.close()
+        print(
+            f"[INFO] collect done saved={saved}/{total} train={split_count['train']} "
+            f"test={split_count['test']} val={split_count['val']}"
+        )
+    finally:
+        for meta_file in meta_files.values():
+            meta_file.close()
 
 
 if __name__ == "__main__":
-    main()
-    simulation_app.close()
+    try:
+        main()
+    finally:
+        simulation_app.close()

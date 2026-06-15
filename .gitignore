@@ -1,8 +1,12 @@
 __pycache__/
 *.pyc
+
+IsaacLab/
 data_isaac/
-IsaacLab/logs/
-IsaacLab/outputs/
+
+.codex/
+.agents/
+
 *.typ
 *.pdf
 *.doc
