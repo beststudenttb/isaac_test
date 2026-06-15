@@ -15,8 +15,8 @@ TARGET_X = 4.0
 ROBOT_SPEED = 1.0
 RESET_DISTANCE = 0.3
 SIM_DT = 0.01
-IMAGE_WIDTH = 640
-IMAGE_HEIGHT = 480
+IMAGE_WIDTH = 224
+IMAGE_HEIGHT = 224
 
 parser = argparse.ArgumentParser(description="Preview many simple ball robot environments.")
 parser.add_argument("--num-envs", type=int, default=64)
@@ -30,7 +30,7 @@ args_cli = parser.parse_args()
 args_cli.enable_cameras = not bool(args_cli.no_cameras) and (
     args_cli.camera_count is None or int(args_cli.camera_count) > 0
 )
-args_cli.rendering_mode = "performance"
+args_cli.rendering_mode = "quality"
 args_cli.headless = True
 args_cli.livestream = 0
 
@@ -165,7 +165,7 @@ def compute_state():
 
 
 def main():
-    render_cfg = sim_utils.RenderCfg(rendering_mode="performance")
+    render_cfg = sim_utils.RenderCfg(rendering_mode="quality")
     sim_cfg = sim_utils.SimulationCfg(dt=SIM_DT, device=args_cli.device, render=render_cfg)
     sim = SimulationContext(sim_cfg)
     sim.set_camera_view(eye=[8.0, -8.0, 6.0], target=[0.0, 0.0, 0.5])
@@ -192,10 +192,11 @@ def main():
         f"grid={cols}x{rows}, spacing={float(args_cli.spacing):.1f}, "
         f"ground={ground_size:.1f}m, target={TARGET_X:.1f}m, speed={ROBOT_SPEED:.1f}m/s, "
         f"reset_dist={RESET_DISTANCE:.1f}m, cameras={camera_count}, camera_every={camera_every}, "
-        f"sensor=tiled_camera, rendering_mode=performance, viewport=off"
+        f"sensor=tiled_camera, rendering_mode=quality, viewport=off"
     )
 
     frames = 0
+    image_count = 0
     last_time = time.perf_counter()
     start_time = last_time
     last_reset_time = last_time
@@ -227,6 +228,8 @@ def main():
         sim.step()
         if camera is not None and frames % camera_every == 0:
             camera.update(dt)
+            images = camera.data.output["rgb"]
+            image_count += int(images.shape[0])
         else:
             _obs = (x_norm, d)
         frames += 1
@@ -234,14 +237,11 @@ def main():
         if now - last_time >= 1.0:
             fps = frames / (now - last_time)
             rtf = fps * sim.get_physics_dt()
-            samples = fps * int(args_cli.num_envs)
-            print(
-                f"[INFO] FPS: {fps:.1f} RTF: {rtf:.2f}x samples/s={samples:.0f} envs={int(args_cli.num_envs)} "
-                f"cameras={camera_count} camera_every={camera_every} "
-                f"resets={reset_count} last_reset_wall={reset_dt:.2f}s last_reset_sim={reset_sim_dt:.2f}s"
-            )
+            img_fps = image_count / (now - last_time)
+            print(f"sim_fps={fps:.1f} img_fps={img_fps:.0f} rtf={rtf:.2f}")
             reset_count = 0
             frames = 0
+            image_count = 0
             last_time = now
         if float(args_cli.duration) > 0.0 and now - start_time >= float(args_cli.duration):
             break

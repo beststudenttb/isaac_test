@@ -3,9 +3,12 @@ __pycache__/
 
 IsaacLab/
 data_isaac/
+models/
 
 .codex/
 .agents/
+.agent/
+chat/
 
 *.typ
 *.pdf

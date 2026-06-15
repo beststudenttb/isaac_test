@@ -8,8 +8,12 @@ Run from the project directory:
 import argparse
 import csv
 import math
+import os
+import signal
 import shutil
+import sys
 import time
+import traceback
 from pathlib import Path
 
 from isaaclab.app import AppLauncher
@@ -39,6 +43,8 @@ parser.add_argument("--spacing", type=float, default=16.0)
 parser.add_argument("--out-dir", type=Path, default=Path(OUT_DIR))
 parser.add_argument("--seed", type=int, default=1)
 parser.add_argument("--visible-only", action="store_true")
+parser.add_argument("--graceful-close", action="store_true")
+parser.add_argument("--close-timeout", type=float, default=10.0)
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 args_cli.enable_cameras = True
@@ -309,8 +315,46 @@ def main():
             meta_file.close()
 
 
+def close_and_exit(exit_code: int):
+    sys.stdout.flush()
+    sys.stderr.flush()
+    if not bool(args_cli.graceful_close):
+        os._exit(exit_code)
+
+    close_timeout = max(0.0, float(args_cli.close_timeout))
+
+    def force_exit(_signum, _frame):
+        print(f"[WARN] simulation_app.close() timeout after {close_timeout:.1f}s, force exit.", flush=True)
+        sys.stderr.flush()
+        os._exit(exit_code)
+
+    old_handler = None
+    if close_timeout > 0.0:
+        old_handler = signal.signal(signal.SIGALRM, force_exit)
+        signal.setitimer(signal.ITIMER_REAL, close_timeout)
+    try:
+        simulation_app.close()
+    except Exception:
+        exit_code = 1
+        traceback.print_exc()
+    finally:
+        if close_timeout > 0.0:
+            signal.setitimer(signal.ITIMER_REAL, 0.0)
+            signal.signal(signal.SIGALRM, old_handler)
+        sys.stdout.flush()
+        sys.stderr.flush()
+    os._exit(exit_code)
+
+
 if __name__ == "__main__":
+    exit_code = 0
     try:
         main()
+    except KeyboardInterrupt:
+        exit_code = 130
+        print("[INFO] collect interrupted", flush=True)
+    except Exception:
+        exit_code = 1
+        traceback.print_exc()
     finally:
-        simulation_app.close()
+        close_and_exit(exit_code)

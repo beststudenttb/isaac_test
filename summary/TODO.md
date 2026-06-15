@@ -3,16 +3,19 @@
 ## 采集与数据验证
 
 - 继续确认 Isaac 图像质量问题：比较 `quality`、`balanced`、`performance` 以及抗锯齿/settle frames 对清晰度和速度的影响。
-- 用小规模采集先验证 `scripts/collect_cv_dataset.py` 能否在采满 `--samples` 后自动退出。
 - 确认手动修改后的 `assets/robots/ball_robot.usd` 中 eye 俯仰角、相机挂载结构和碰撞设置是否符合后续训练需求。
-- 后续开始训练前，确认 `px_x`、`dist` 标签和真实图像读取结果之间的误差范围。
+- 继续用肉眼抽查数据集图片质量，并确认 `px_x`、`dist` 标签和真实图像读取结果之间的误差范围。
 
-## 阶段一：视觉预训练（代码移植）
+## 阶段一：视觉预训练
 
-- 移植模型到 `src/`：`ResNet18FPNReserveXBin` + `ResNet18FPNXBin`（去掉未用的 bin 分支），共享 ResNet18+FPN+heatmap backbone。
-- 移植结构配置（`RESNET18_FPN_RESERVE_XBIN_CONFIG` 等）。
-- 写训练入口到 `train/`：读 `data_isaac` 的 png+txt 的数据集类、训练/评估循环、增强、checkpoint。
-- 产出 `models/cv_reserve/cv_xbin_best.pt` 等，并与 Webots 结果对照。
+- 顺序训练并比较四个 CV 模型：`resnet`、`mobile`、`old`、`old-mobile`。
+- 用 `--val --size` 查看最终 `val` 集上的 gt/pred 和 mean err，重点比较原始像素 `x` 误差与 `dist` 误差。
+- 根据四模型结果决定后续 RL 使用的 encoder checkpoint。
+- 若 `old` 系明显更好，再考虑是否恢复 bin head 或补充 shared feature 对照。
+
+## 多 agent 协作（暂停）
+
+- plan / state 通信机制暂不启用；后续如果确实需要双 agent 并行，再重新设计并定稿。
 
 ## 阶段二：联合训练（开放问题）
 

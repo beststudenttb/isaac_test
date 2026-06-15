@@ -11,7 +11,7 @@ import os
 
 from isaaclab.app import AppLauncher
 
-ROBOT_USD = "./assets/robots/ball_robot.usd"
+ROBOT_USD = "./scripts/generated_ball_robot.usd"
 EYE_PITCH_DEG = 15.0
 
 parser = argparse.ArgumentParser(description="Export the ball robot USD.")
