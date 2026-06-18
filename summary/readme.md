@@ -2,7 +2,7 @@
 
 本项目是视觉强化学习机器人研究项目，从原 Webots + PPO + teacher guidance + imitation learning 路线迁移到 Isaac / IsaacLab，用于测试并行仿真、相机采集和后续视觉策略训练。整体走 train-by-cheat：特权信息 teacher PPO 训练视觉 student。
 
-当前阶段：环境生成、视觉数据采集和视觉预训练入口已就绪，正在比较不同视觉模型结构。
+当前阶段：teacher PPO、自写 student PPO、视觉 student 训练入口、视觉数据采集和 CV 预训练入口已就绪，正在把冻结 encoder 接入视觉 student 做第一版复现。
 
 当前主要方向：
 
@@ -10,8 +10,11 @@
 - 机器人主体由 `assets/robots/ball_robot.usd` 提供，结构包含 body、head、eye；eye 用于挂载相机。
 - 采集脚本 `scripts/collect_cv_dataset.py` 使用 TiledCamera 并行采集图像，标签重点是小球图像横向位置 `px_x` 和距离 `dist`。
 - 数据集默认输出到 `./data_isaac/`，运行前会清空旧数据；按 train/test/val 概率分目录保存，文件名使用全局共享编号。label 一行格式 `x_norm dist dist_bin 0 0 0 visible`。
+- 找球任务阶段定义固定记录在 `summary/task_flow.md`。
 - 当前 Isaac 带视觉相机的并行性能瓶颈主要来自相机渲染本身，env 数量、分辨率、rendering mode 都会明显影响速度和图像质量。
+- 视觉训练当前临时使用 `balanced + DLSS performance(dlss_mode=0)`；采集脚本支持用参数指定渲染模式和抗锯齿模式。
 - `train/train_cv.py` 使用 `train/test/val = 7/2/1` 的语义：`train` 参与训练，`test` 用于训练过程评估和保存 best，`val` 只在 `--val` 时做最终查看。
+- `scripts/run_vision_pipeline.sh` 可顺序执行：采集 50000 张图像、训练四个 CV 模型、用 `old + xd` 接入视觉 student。
 
 当前目录约定：
 
@@ -42,7 +45,7 @@
 4. `old` 是旧 Webots 的 `ResNet18FPNReserveXBinFeatureExtractor` 结构迁移版，仅改类名和输入适配；`old-mobile` 使用同一套 old FPN/reserve/head 结构，但 backbone 换为 MobileNetV3-small。
 5. **bin head 先删**（原脚本 `bin_loss` 被置零，dist_bin 实际未参与）。后续 RL 若需离散距离信号再加回并真正用 CE 训。
 6. 增强 / loss / 超参沿用旧实验中已验证的核心设定：增强（仅 train）亮度 ×U(0.9,1.1)、对比度绕 127.5 ×U(0.9,1.1)、30% 概率加高斯噪声 std=3；loss = `SmoothL1(x) + SmoothL1(dist)`（权重均 1.0）；updates=1000, batch=64, lr=1e-4, Adam，按 test_loss 存 best。
-7. `scripts/train_cv_all.py` 可按顺序训练四个模型，产出分别位于 `models/cv_resnet`、`models/cv_mobile`、`models/cv_old`、`models/cv_old_mobile`。
+7. `scripts/train_cv_all.py` 可按顺序训练或 val 四个模型，产出分别位于 `models/cv_resnet`、`models/cv_mobile`、`models/cv_old`、`models/cv_old_mobile`。
 8. 运行环境：纯 PyTorch，不依赖 Isaac，可在 conda `isaac_test` 直接跑；`--device auto` 会优先使用 CUDA。
 
 ## 联合训练方案（阶段二，后续方向）

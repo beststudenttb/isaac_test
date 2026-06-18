@@ -1,0 +1,11 @@
+update = 20
+step = 81920
+success_rate = 1.0
+fail_rate = 0.0
+timeout_rate = 0.0
+mean_return = 27.240009307861328
+mean_len = 188.375
+std_mean = 0.4380476176738739
+std_min = 0.4373890161514282
+std_max = 0.4393489956855774
+teacher_coef = 1.0

@@ -1,0 +1,8 @@
+step = 5242880
+rollout = 40
+episodes = 2048
+success_rate = 0.9814453125
+fail_rate = 0.0
+timeout_rate = 0.0185546875
+mean_return = 23.488011399067275
+mean_len = 126.25390625

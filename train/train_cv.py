@@ -82,6 +82,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--updates", type=int, default=1000)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--size", type=int, default=0)
+    parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--data-dir", type=Path, default=DATA_DIR)
     parser.add_argument("--out-dir", type=Path, default=None)
     parser.add_argument("--device", choices=["auto", "cpu", "cuda", "mps"], default="auto")
@@ -109,16 +110,17 @@ def loss_fn(output: dict[str, torch.Tensor], batch: dict[str, torch.Tensor], dev
     return x_loss + dist_loss, x_loss, dist_loss
 
 
-def make_eval_loader(dataset: Dataset, batch_size: int, size: int) -> DataLoader:
+def make_eval_loader(dataset: Dataset, batch_size: int, size: int, seed: int) -> DataLoader:
     if int(size) > 0 and int(size) < len(dataset):
-        indices = torch.randperm(len(dataset))[: int(size)].tolist()
+        generator = torch.Generator().manual_seed(int(seed))
+        indices = torch.randperm(len(dataset), generator=generator)[: int(size)].tolist()
         dataset = Subset(dataset, indices)
     return DataLoader(dataset, batch_size=int(batch_size), shuffle=False, num_workers=0)
 
 
-def evaluate(model: torch.nn.Module, dataset: Dataset, batch_size: int, size: int, device: torch.device):
+def evaluate(model: torch.nn.Module, dataset: Dataset, batch_size: int, size: int, seed: int, device: torch.device):
     model.eval()
-    loader = make_eval_loader(dataset, batch_size, size)
+    loader = make_eval_loader(dataset, batch_size, size, seed)
     loss_sum = 0.0
     x_sum = 0.0
     dist_sum = 0.0
@@ -136,14 +138,15 @@ def evaluate(model: torch.nn.Module, dataset: Dataset, batch_size: int, size: in
     return loss_sum / count, x_sum / count, dist_sum / count, count
 
 
-def print_predictions(model: torch.nn.Module, dataset: Dataset, batch_size: int, size: int, device: torch.device):
+def print_predictions(model: torch.nn.Module, dataset: Dataset, batch_size: int, size: int, seed: int, device: torch.device):
     model.eval()
-    loader = make_eval_loader(dataset, batch_size, size)
+    loader = make_eval_loader(dataset, batch_size, size, seed)
     x_err_sum = 0.0
     dist_err_sum = 0.0
     count = 0
     with torch.no_grad():
         for batch in loader:
+            n = int(batch["x"].shape[0])
             output = model(batch["image"])
             x_gt = batch["x"].float().view(-1, 1).to(device)
             dist_gt = batch["dist"].float().view(-1, 1).to(device)
@@ -168,7 +171,6 @@ def print_predictions(model: torch.nn.Module, dataset: Dataset, batch_size: int,
                     f"gt_dist={dist_gt_list[i]:.2f} pred_dist={dist_pred_list[i]:.2f} err_dist={dist_err_list[i]:.2f}"
                 )
 
-            n = int(batch["x"].shape[0])
             x_err_sum += float(x_err.sum().detach())
             dist_err_sum += float(dist_err.sum().detach())
             count += n
@@ -241,7 +243,9 @@ def train(args: argparse.Namespace, device: torch.device):
                     train_loss = train_loss_sum / train_count
                     train_x = train_x_sum / train_count
                     train_dist = train_dist_sum / train_count
-                    test_loss, test_x, test_dist, test_count = evaluate(model, test_set, int(args.batch_size), int(args.size), device)
+                    test_loss, test_x, test_dist, test_count = evaluate(
+                        model, test_set, int(args.batch_size), int(args.size), int(args.seed), device
+                    )
                     print(
                         f"update={update} train={train_loss:.5f} x={train_x:.5f} dist={train_dist:.5f} "
                         f"test={test_loss:.5f} x={test_x:.5f} dist={test_dist:.5f} n={test_count}"
@@ -276,15 +280,15 @@ def val(args: argparse.Namespace, device: torch.device):
     model = make_model(args.model, pretrained=False).to(device)
     ckpt = torch.load(args.out_dir / "best.pt", map_location=device)
     model.load_state_dict(ckpt["model_state_dict"])
-    print_predictions(model, val_set, int(args.batch_size), int(args.size), device)
+    print_predictions(model, val_set, int(args.batch_size), int(args.size), int(args.seed), device)
 
 
 def main():
     args = parse_args()
+    np.random.seed(int(args.seed))
+    torch.manual_seed(int(args.seed))
     device = pick_device(args.device)
     if args.train:
-        np.random.seed(0)
-        torch.manual_seed(0)
         train(args, device)
     if args.val:
         val(args, device)

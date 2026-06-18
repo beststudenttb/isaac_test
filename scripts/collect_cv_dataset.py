@@ -43,12 +43,15 @@ parser.add_argument("--spacing", type=float, default=16.0)
 parser.add_argument("--out-dir", type=Path, default=Path(OUT_DIR))
 parser.add_argument("--seed", type=int, default=1)
 parser.add_argument("--visible-only", action="store_true")
+parser.add_argument("--render-mode", default="quality")
+parser.add_argument("--aa", default=None)
+parser.add_argument("--dlss-mode", type=int, default=None)
 parser.add_argument("--graceful-close", action="store_true")
 parser.add_argument("--close-timeout", type=float, default=10.0)
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 args_cli.enable_cameras = True
-args_cli.rendering_mode = "quality"
+args_cli.rendering_mode = args_cli.render_mode
 args_cli.headless = True
 args_cli.livestream = 0
 
@@ -178,7 +181,13 @@ def quat_to_matrix(q: np.ndarray) -> np.ndarray:
     )
 
 
-def label_from_camera(cam_pos: np.ndarray, cam_quat: np.ndarray, intrinsic: np.ndarray, target_pos: np.ndarray, dist: float):
+def label_from_camera(
+    cam_pos: np.ndarray,
+    cam_quat: np.ndarray,
+    intrinsic: np.ndarray,
+    target_pos: np.ndarray,
+    robot_origin: np.ndarray,
+):
     rot = quat_to_matrix(cam_quat)
     cam_vec = rot.T @ (target_pos - cam_pos)
     cam_forward = float(cam_vec[0])
@@ -188,6 +197,7 @@ def label_from_camera(cam_pos: np.ndarray, cam_quat: np.ndarray, intrinsic: np.n
     px_x = cx - fx * cam_left / cam_forward
     x_norm = (px_x - cx) / cx
     visible = int(cam_forward > 0.0 and 0.0 <= px_x < IMAGE_WIDTH)
+    dist = float((rot.T @ (target_pos - robot_origin))[0])
     dist_bin = int(sum(dist > edge for edge in DIST_BIN_EDGES))
     if not visible:
         return -IMAGE_WIDTH * 0.5, -1.0, 0.0, 0, 0
@@ -232,7 +242,12 @@ def main():
             meta_writers[split].writeheader()
 
         rng = np.random.default_rng(int(args_cli.seed))
-        render_cfg = sim_utils.RenderCfg(rendering_mode="quality")
+        render_cfg = sim_utils.RenderCfg(
+            rendering_mode=str(args_cli.render_mode),
+            antialiasing_mode=args_cli.aa,
+            dlss_mode=args_cli.dlss_mode,
+            enable_dlssg=False,
+        )
         sim_cfg = sim_utils.SimulationCfg(dt=0.04, device=args_cli.device, render=render_cfg)
         sim = SimulationContext(sim_cfg)
         camera, target_ops, env_origins = design_scene()
@@ -272,7 +287,8 @@ def main():
                 forward, lateral, dist, angle = batch[env_id]
                 env_x, env_y, env_z = env_origins[env_id]
                 target_pos = np.array([env_x + forward, env_y + lateral, env_z + TARGET_RADIUS], dtype=np.float64)
-                label = label_from_camera(cam_pos[env_id], cam_quat[env_id], intrinsics[env_id], target_pos, dist)
+                robot_origin = np.array([env_x, env_y, env_z + ROBOT_Z], dtype=np.float64)
+                label = label_from_camera(cam_pos[env_id], cam_quat[env_id], intrinsics[env_id], target_pos, robot_origin)
                 if bool(args_cli.visible_only) and not label[4]:
                     continue
                 split = choose_split(rng)
@@ -286,7 +302,7 @@ def main():
                         "env_id": env_id,
                         "px_x": f"{px_x:.6f}",
                         "x_norm": f"{x_norm:.6f}",
-                        "dist": f"{dist:.6f}",
+                        "dist": f"{label_dist:.6f}",
                         "angle_deg": f"{math.degrees(angle):.6f}",
                         "target_x": f"{forward:.6f}",
                         "target_y": f"{lateral:.6f}",

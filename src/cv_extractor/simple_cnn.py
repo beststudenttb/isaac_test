@@ -106,12 +106,13 @@ class BallVisionNet(nn.Module):
         else:
             tensor = torch.as_tensor(image, device=device)
 
+        is_uint8 = tensor.dtype == torch.uint8
         if tensor.ndim == 3:
             tensor = tensor.unsqueeze(0)
         if tensor.shape[-1] == 3:
             tensor = tensor.permute(0, 3, 1, 2).contiguous()
         tensor = tensor.float()
-        if tensor.max() > 2.0:
+        if is_uint8:
             tensor = tensor / 255.0
         return tensor
 
@@ -202,12 +203,13 @@ class MobileBallNet(nn.Module):
         else:
             tensor = torch.as_tensor(image, device=device)
 
+        is_uint8 = tensor.dtype == torch.uint8
         if tensor.ndim == 3:
             tensor = tensor.unsqueeze(0)
         if tensor.shape[-1] == 3:
             tensor = tensor.permute(0, 3, 1, 2).contiguous()
         tensor = tensor.float()
-        if tensor.max() > 2.0:
+        if is_uint8:
             tensor = tensor / 255.0
         return tensor
 
@@ -348,12 +350,13 @@ class OldFPNBallNet(nn.Module):
         else:
             tensor = torch.as_tensor(image, device=device)
 
+        is_uint8 = tensor.dtype == torch.uint8
         if tensor.ndim == 3:
             tensor = tensor.unsqueeze(0)
         if tensor.shape[-1] == 3:
             tensor = tensor.permute(0, 3, 1, 2).contiguous()
         tensor = tensor.float()
-        if tensor.max() > 2.0:
+        if is_uint8:
             tensor = tensor / 255.0
         return tensor
 

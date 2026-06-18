@@ -4,6 +4,8 @@ __pycache__/
 IsaacLab/
 data_isaac/
 models/
+camera_sweep_runs/
+camera_sweep*.mp4
 
 .codex/
 .agents/
@@ -14,3 +16,6 @@ chat/
 *.pdf
 *.doc
 *.docx
+*.jpg
+*.png
+*.txt
