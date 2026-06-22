@@ -3,12 +3,13 @@
 from pathlib import Path
 
 
-OUT_DIR = Path("./models/teacher_ppo")  # 训练现场输出目录，不上传 Git。
+OUT_DIR = Path("./models/rl/teacher_ppo")  # 训练现场输出目录，不上传 Git。
 CLEAR_OUT_DIR = True  # 每次开始训练前清空 OUT_DIR。
 
 NUM_ENVS = 512  # 并行环境数量。
 TOTAL_STEPS = 8_192_000  # SB3 total_timesteps，所有 env 合计 transition 数。
 EPISODE_S = 15.0  # 单个 episode 最长仿真时间，单位秒。
+STOP_N = 5  # 连续多少 step stop 后 success done。
 SEED = 0  # 随机种子。
 DEVICE = None  # None 表示使用 IsaacLab 默认或命令行 --device。
 USE_CAMERA = False  # 是否在 teacher 训练环境里启用相机。

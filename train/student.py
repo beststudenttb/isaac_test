@@ -2,7 +2,7 @@
 
 Run from the project root:
 
-    ./IsaacLab/isaaclab.sh -p train/train_student.py
+    ./IsaacLab/isaaclab.sh -p train/student.py
 """
 
 from __future__ import annotations
@@ -146,6 +146,7 @@ def make_env() -> BallPPOEnv:
     cfg = BallPPOEnvCfg()
     cfg.seed = int(student_cfg.SEED)
     cfg.episode_length_s = float(student_cfg.EPISODE_S)
+    cfg.stop_n = int(student_cfg.STOP_N)
     cfg.scene.num_envs = int(student_cfg.NUM_ENVS)
     cfg.sim.device = args_cli.device
     cfg.use_camera = bool(student_cfg.USE_CAMERA)

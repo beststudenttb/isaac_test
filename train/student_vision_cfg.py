@@ -3,12 +3,13 @@
 from pathlib import Path
 
 
-OUT_DIR = Path("./models/student_vision")  # 视觉 student PPO 输出目录。
+OUT_DIR = Path("./models/rl/student_vision")  # 视觉 student PPO 输出目录。
 CLEAR_OUT_DIR = True  # 每次训练前清空 OUT_DIR。
 
-NUM_ENVS = 32  # 并行环境数量；视觉训练先用较小数量测试显存和速度。
+NUM_ENVS = 128  # 并行环境数量；视觉训练先用较小数量测试显存和速度。
 TOTAL_STEPS = 8_192_000  # 总采样步数，按 SB3 total_timesteps 语义。
 EPISODE_S = 15.0  # 单个 episode 最长仿真时间，单位秒。
+STOP_N = 3  # 视觉 student 成功需要连续 stop 的 step 数；先用 1 增加 stop 信号。
 SEED = 1  # 随机种子。
 DEVICE = None  # None 表示使用 IsaacLab 命令行 device。
 USE_CAMERA = True  # 视觉 student 必须开启相机。
@@ -22,9 +23,9 @@ VISION_CHOICE = "old_reserve"  # 从文件末尾 VISION_CHOICES 里选择一个�
 FREEZE_VISION = True  # 第一版先冻结视觉 encoder，只训练 PPO。
 ENCODER_FP16 = True  # 冻结 encoder 前向使用 fp16 autocast。
 
-TEACHER_PATH = "./models/teacher_ppo/best_val.zip"  # teacher SB3 PPO 模型路径。
+TEACHER_PATH = "./models/rl/teacher_ppo/best_val.zip"  # teacher SB3 PPO 模型路径。
 TRAIN_MODE = "student"  # student 使用 teacher loss；teacher 关闭 teacher loss。
-TEACHER_LOSS = 1.0  # teacher imitation loss 权重；0 表示关闭。
+TEACHER_LOSS = 0.0  # teacher imitation loss 权重；0 表示关闭。
 TEACHER_LOSS_MIN = 0.01  # teacher imitation loss 权重下限。
 TEACHER_DOWN_SUCCESS = 0.00  # 每次 val 后，按 success_rate 乘该值降低 teacher 权重。
 TEACHER_UP_OUT = 0.00  # 每次 val 后，按 out/fail_rate 乘该值提高 teacher 权重。
@@ -63,61 +64,61 @@ LOG_EVERY = 1  # 每多少 update 打印一次日志。
 VISION_CHOICES = {
     "resnet_reserve": {
         "model": "resnet",
-        "ckpt": Path("./models/cv_resnet/best.pt"),
+        "ckpt": Path("./models/vision/cv_resnet/best.pt"),
         "state": "reserve_feature",
         "dim": 128,
     },
     "resnet_pred": {
         "model": "resnet",
-        "ckpt": Path("./models/cv_resnet/best.pt"),
+        "ckpt": Path("./models/vision/cv_resnet/best.pt"),
         "state": "pred",
         "dim": 2,
     },
     "mobile_reserve": {
         "model": "mobile",
-        "ckpt": Path("./models/cv_mobile/best.pt"),
+        "ckpt": Path("./models/vision/cv_mobile/best.pt"),
         "state": "reserve_feature",
         "dim": 128,
     },
     "mobile_pred": {
         "model": "mobile",
-        "ckpt": Path("./models/cv_mobile/best.pt"),
+        "ckpt": Path("./models/vision/cv_mobile/best.pt"),
         "state": "pred",
         "dim": 2,
     },
     "old_shared": {
         "model": "old",
-        "ckpt": Path("./models/cv_old/best.pt"),
+        "ckpt": Path("./models/vision/cv_old/best.pt"),
         "state": "shared_feature",
         "dim": 516,
     },
     "old_reserve": {
         "model": "old",
-        "ckpt": Path("./models/cv_old/best.pt"),
+        "ckpt": Path("./models/vision/cv_old/best.pt"),
         "state": "reserve_feature",
         "dim": 128,
     },
     "old_pred": {
         "model": "old",
-        "ckpt": Path("./models/cv_old/best.pt"),
+        "ckpt": Path("./models/vision/cv_old/best.pt"),
         "state": "pred",
         "dim": 2,
     },
     "old_mobile_shared": {
         "model": "old-mobile",
-        "ckpt": Path("./models/cv_old_mobile/best.pt"),
+        "ckpt": Path("./models/vision/cv_old_mobile/best.pt"),
         "state": "shared_feature",
         "dim": 516,
     },
     "old_mobile_reserve": {
         "model": "old-mobile",
-        "ckpt": Path("./models/cv_old_mobile/best.pt"),
+        "ckpt": Path("./models/vision/cv_old_mobile/best.pt"),
         "state": "reserve_feature",
         "dim": 128,
     },
     "old_mobile_pred": {
         "model": "old-mobile",
-        "ckpt": Path("./models/cv_old_mobile/best.pt"),
+        "ckpt": Path("./models/vision/cv_old_mobile/best.pt"),
         "state": "pred",
         "dim": 2,
     },

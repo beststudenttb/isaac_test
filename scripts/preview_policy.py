@@ -2,7 +2,7 @@
 
 Run from the project root:
 
-    ./IsaacLab/isaaclab.sh -p scripts/preview_policy.py --model models/teacher_ppo/best_val.zip
+    ./IsaacLab/isaaclab.sh -p scripts/preview_policy.py --model models/rl/teacher_ppo/best_val.zip
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from isaaclab.app import AppLauncher
 
 
 parser = argparse.ArgumentParser(description="Preview one deterministic teacher policy.")
-parser.add_argument("--model", type=str, default="models/teacher_ppo/best_val.zip")
+parser.add_argument("--model", type=str, default="models/rl/teacher_ppo/best_val.zip")
 parser.add_argument("--episode-s", type=float, default=15.0)
 parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--duration", type=float, default=0.0)

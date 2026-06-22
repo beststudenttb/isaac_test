@@ -50,7 +50,7 @@ def main():
     for model in MODELS:
         cmd = [
             sys.executable,
-            "train/train_cv.py",
+            "train/cv.py",
             mode,
             "--model",
             model,

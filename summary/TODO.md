@@ -12,6 +12,12 @@
 - 用 `--val --size` 查看最终 `val` 集上的 gt/pred 和 mean err，重点比较原始像素 `x` 误差与 `dist` 误差。
 - 根据四模型结果决定后续 RL 使用的 encoder checkpoint。
 - 若 `old` 系明显更好，再考虑是否恢复 bin head 或补充 shared feature 对照。
+- 试验纯表征预训练：用特权状态定义物理距离，把 RGB 映射到归一化 latent space，使 latent 距离结构接近特权状态距离；第一版不接回归 head，只训练表征空间。
+  - 输入：RGB 图像与对应特权状态 `px_x/dist`。
+  - 表征：`image_encoder(RGB) -> z`，`z` 做归一化，避免尺度漂移。
+  - 监督：batch 内两两计算特权状态距离，并约束 latent 两两距离与之匹配。
+  - 距离定义：`px_x` 与 `dist` 分开归一化，stop 附近可提高权重，避免远距离差异主导。
+  - PPO 对照：使用纯 `z` 作为 state，与当前 `xd/shared/feature` 结果比较。
 
 ## 阶段二：视觉 student
 

@@ -2,8 +2,8 @@
 
 Run from the project root:
 
-    python train/train_cv.py --train --model resnet --updates 1000 --batch-size 64
-    python train/train_cv.py --val --model old-mobile --size 1000
+    python train/cv.py --train --model resnet --updates 1000 --batch-size 64
+    python train/cv.py --val --model old-mobile --size 1000
 """
 
 from __future__ import annotations
@@ -34,10 +34,10 @@ MODEL_CLASSES = {
     "old-mobile": OldMobileBallNet,
 }
 MODEL_DIRS = {
-    "resnet": Path("./models/cv_resnet"),
-    "mobile": Path("./models/cv_mobile"),
-    "old": Path("./models/cv_old"),
-    "old-mobile": Path("./models/cv_old_mobile"),
+    "resnet": Path("./models/vision/cv_resnet"),
+    "mobile": Path("./models/vision/cv_mobile"),
+    "old": Path("./models/vision/cv_old"),
+    "old-mobile": Path("./models/vision/cv_old_mobile"),
 }
 
 

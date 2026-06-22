@@ -2,7 +2,7 @@
 
 Run from the project root:
 
-    ./IsaacLab/isaaclab.sh -p train/train_student_vision.py
+    ./IsaacLab/isaaclab.sh -p train/student_vision.py
 """
 
 from __future__ import annotations
@@ -38,6 +38,8 @@ parser = argparse.ArgumentParser(description="Train vision student with custom P
 parser.add_argument("--show", action="store_true")
 parser.add_argument("--state", choices=["xd", "shared", "feature"], default=None)
 parser.add_argument("--cv-model", choices=["old", "old-m", "resnet", "mobile"], default=None)
+parser.add_argument("--num-envs", type=int, default=None)
+parser.add_argument("--resume", type=int, default=None)
 mode_group = parser.add_mutually_exclusive_group()
 mode_group.add_argument("--student", action="store_true")
 mode_group.add_argument("--teacher", action="store_true")
@@ -73,6 +75,7 @@ from torchvision.io import write_png
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src import task_cfg
 from src.cv_extractor.simple_cnn import BallVisionNet, MobileBallNet, OldBallVisionNet, OldMobileBallNet
 from src.ppo import ActorCritic, Rollout, ppo_update
 from src.sb3_env import BallPPOEnv, BallPPOEnvCfg
@@ -188,7 +191,7 @@ VAL_FIELDS = [
 
 def out_dir() -> Path:
     path = Path(cfg.OUT_DIR) / run_name()
-    if bool(cfg.CLEAR_OUT_DIR) and path.exists():
+    if args_cli.resume is None and bool(cfg.CLEAR_OUT_DIR) and path.exists():
         shutil.rmtree(path)
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -204,13 +207,52 @@ def write_config(path: Path):
     lines.append(f"CLI_CV_MODEL = {args_cli.cv_model!r}")
     lines.append(f"CLI_MODE = {train_mode()!r}")
     lines.append(f"VISION_CHOICE_USED = {vision_choice_name()!r}")
+    lines.append(f"RESUME = {str(args_cli.resume)!r}")
     (path / "config.py").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def open_csv(path: Path, fields: list[str]):
-    file = path.open("w", newline="", encoding="utf-8")
+def truncate_csv(path: Path, fields: list[str], update: int):
+    rows = []
+    if path.exists() and path.stat().st_size > 0:
+        with path.open("r", newline="", encoding="utf-8") as file:
+            rows = [row for row in csv.DictReader(file) if int(row["update"]) <= int(update)]
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def cleanup_resume_files(path: Path, update: int):
+    for file in path.glob("model_*.pt"):
+        model_update = int(file.stem.split("_")[1])
+        if model_update > int(update):
+            file.unlink()
+    update_dir = path / "updates"
+    if update_dir.exists():
+        for file in update_dir.glob("update_*.pt"):
+            model_update = int(file.stem.split("_")[1])
+            if model_update > int(update):
+                file.unlink()
+    last = path / "last.pt"
+    if last.exists():
+        last.unlink()
+    best_info = path / "best_info.txt"
+    if best_info.exists():
+        best_update = int(
+            next(line.split("=", 1)[1].strip() for line in best_info.read_text(encoding="utf-8").splitlines() if line.startswith("update"))
+        )
+        if best_update > int(update):
+            best_info.unlink()
+            best = path / "best.pt"
+            if best.exists():
+                best.unlink()
+
+
+def open_csv(path: Path, fields: list[str], append: bool):
+    file = path.open("a" if append else "w", newline="", encoding="utf-8")
     writer = csv.DictWriter(file, fieldnames=fields)
-    writer.writeheader()
+    if not append:
+        writer.writeheader()
     return file, writer
 
 
@@ -218,7 +260,8 @@ def make_env() -> BallPPOEnv:
     env_cfg = BallPPOEnvCfg()
     env_cfg.seed = int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
-    env_cfg.scene.num_envs = int(cfg.NUM_ENVS)
+    env_cfg.stop_n = int(cfg.STOP_N)
+    env_cfg.scene.num_envs = int(args_cli.num_envs) if args_cli.num_envs is not None else int(cfg.NUM_ENVS)
     env_cfg.sim.device = args_cli.device
     env_cfg.sim.render = sim_utils.RenderCfg(
         rendering_mode=str(cfg.RENDERING_MODE),
@@ -253,7 +296,8 @@ def load_encoder(device: torch.device) -> nn.Module:
 def select_state(out: dict[str, torch.Tensor]) -> torch.Tensor:
     state = str(vision_choice()["state"])
     if state == "pred":
-        return torch.cat([out["x_pred"], out["distance_pred"]], dim=1)
+        dist = torch.clamp(out["distance_pred"] / float(task_cfg.FAIL_FAR), 0.0, 1.0)
+        return torch.cat([out["x_pred"], dist], dim=1)
     value = out[state]
     if value.ndim > 2:
         value = value.flatten(1)
@@ -343,7 +387,13 @@ def teacher_actions(teacher, priv_obs: torch.Tensor) -> torch.Tensor | None:
     if teacher is None:
         return None
     actions, _ = teacher.predict(priv_obs.detach().cpu().numpy(), deterministic=True)
-    return torch.as_tensor(actions, device=priv_obs.device, dtype=priv_obs.dtype)
+    actions = torch.as_tensor(actions, device=priv_obs.device, dtype=priv_obs.dtype)
+    x_ok = torch.abs(priv_obs[:, 0]) <= float(task_cfg.STOP_X_TOL) / (float(task_cfg.IMAGE_WIDTH) * 0.5)
+    d_ok = torch.abs(priv_obs[:, 1] - float(task_cfg.STOP_D) / float(task_cfg.FAIL_FAR)) <= (
+        float(task_cfg.STOP_D_TOL) / float(task_cfg.FAIL_FAR)
+    )
+    actions[x_ok & d_ok] = 0.0
+    return actions
 
 
 def traj_row(
@@ -474,11 +524,24 @@ def main():
     torch.manual_seed(seed)
 
     log_dir = out_dir()
+    resume_ckpt = None
+    resume_update = 0
+    if args_cli.resume is not None:
+        resume_path = log_dir / "updates" / f"update_{int(args_cli.resume):06d}.pt"
+        resume_ckpt = torch.load(resume_path, map_location=args_cli.device)
+        resume_update = int(resume_ckpt["update"])
+    if resume_ckpt is not None:
+        truncate_csv(log_dir / "log.csv", LOG_FIELDS, resume_update)
+        truncate_csv(log_dir / "val.csv", VAL_FIELDS, resume_update)
+        truncate_csv(log_dir / "traj_train_env0.csv", TRAJ_FIELDS, resume_update)
+        truncate_csv(log_dir / "traj_val.csv", TRAJ_FIELDS, resume_update)
+        cleanup_resume_files(log_dir, resume_update)
     write_config(log_dir)
-    log_file, log_writer = open_csv(log_dir / "log.csv", LOG_FIELDS)
-    val_file, val_writer = open_csv(log_dir / "val.csv", VAL_FIELDS)
-    train_traj_file, train_traj_writer = open_csv(log_dir / "traj_train_env0.csv", TRAJ_FIELDS)
-    val_traj_file, val_traj_writer = open_csv(log_dir / "traj_val.csv", TRAJ_FIELDS)
+    append_csv = resume_ckpt is not None
+    log_file, log_writer = open_csv(log_dir / "log.csv", LOG_FIELDS, append_csv)
+    val_file, val_writer = open_csv(log_dir / "val.csv", VAL_FIELDS, append_csv)
+    train_traj_file, train_traj_writer = open_csv(log_dir / "traj_train_env0.csv", TRAJ_FIELDS, append_csv)
+    val_traj_file, val_traj_writer = open_csv(log_dir / "traj_val.csv", TRAJ_FIELDS, append_csv)
     update_dir = log_dir / "updates"
     if int(cfg.SAVE_UPDATE_EVERY) > 0:
         update_dir.mkdir(parents=True, exist_ok=True)
@@ -513,17 +576,26 @@ def main():
 
     best = -1.0
     last_info = {}
+    if resume_ckpt is not None:
+        if int(resume_ckpt["vision_feature_dim"]) != int(choice["dim"]):
+            raise ValueError("resume checkpoint vision feature dim does not match current state")
+        model.load_state_dict(resume_ckpt["model"])
+        opt.load_state_dict(resume_ckpt["optimizer"])
+        best = float(resume_ckpt["best"])
+        teacher_coef = float(resume_ckpt["teacher_coef"]) if mode == "student" else 0.0
+        last_info = dict(resume_ckpt["info"])
     steps_per_update = env.num_envs * int(cfg.N_STEPS)
     total_steps = int(cfg.TOTAL_STEPS)
     updates = int(math.ceil(total_steps / steps_per_update))
+    start_update = resume_update + 1
     print(
         f"[INFO] vision student PPO out={log_dir} envs={env.num_envs} total_steps={total_steps} "
-        f"updates={updates} n_steps={cfg.N_STEPS} device={env.device} "
+        f"updates={updates} start_update={start_update} n_steps={cfg.N_STEPS} device={env.device} "
         f"vision_choice={vision_choice_name()} mode={mode} teacher_loss={teacher_coef:.3f}"
     )
 
     try:
-        for update in range(1, updates + 1):
+        for update in range(start_update, updates + 1):
             rollout = Rollout(
                 steps=int(cfg.N_STEPS),
                 envs=env.num_envs,
@@ -570,7 +642,7 @@ def main():
                     timeout_count += int(((env.last_timeout | truncated) & done).sum().item())
                 priv_t = obs_next["policy"]
                 obs_t = vision_obs(env, encoder)
-                if update == 1 and t == 1:
+                if resume_ckpt is None and update == 1 and t == 1:
                     save_env0_image(env)
 
             with torch.no_grad():

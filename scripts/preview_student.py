@@ -2,7 +2,7 @@
 
 Run from the project root:
 
-    ./IsaacLab/isaaclab.sh -p scripts/preview_student.py --model models/student_ppo/last.pt
+    ./IsaacLab/isaaclab.sh -p scripts/preview_student.py --model models/rl/student_ppo/last.pt
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from isaaclab.app import AppLauncher
 
 
 parser = argparse.ArgumentParser(description="Preview one deterministic custom student policy.")
-parser.add_argument("--model", type=str, default="models/student_ppo/last.pt")
+parser.add_argument("--model", type=str, default="models/rl/student_ppo/last.pt")
 parser.add_argument("--episode-s", type=float, default=15.0)
 parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--duration", type=float, default=0.0)

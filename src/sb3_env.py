@@ -20,11 +20,12 @@ class BallPPOEnvCfg(BallEnvCfg):
     xy_speed = task_cfg.XY_SPEED
     head_speed = task_cfg.HEAD_SPEED
     stop_eps = task_cfg.STOP_EPS
-    stop_n = task_cfg.STOP_N
+    stop_n = 5
     fail_near = task_cfg.FAIL_NEAR
     fail_far = task_cfg.FAIL_FAR
 
     k_search = task_cfg.K_SEARCH
+    k_time = task_cfg.K_TIME
     k_x = task_cfg.K_X
     k_d = task_cfg.K_D
     k_stop_a = task_cfg.K_STOP_A
@@ -37,6 +38,7 @@ class BallPPOEnvCfg(BallEnvCfg):
     r_stop_in = task_cfg.R_STOP_IN
     r_stop_out = task_cfg.R_STOP_OUT
     r_stop_q = task_cfg.R_STOP_Q
+    r_stop = task_cfg.R_STOP
     r_success = task_cfg.R_SUCCESS
     r_fail = task_cfg.R_FAIL
 
@@ -148,6 +150,7 @@ class BallPPOEnv(BallEnv):
             -self.cfg.k_search * (self.actions[:, 0] ** 2 + self.actions[:, 1] ** 2),
             torch.zeros_like(reward),
         )
+        reward += torch.where(seen, torch.full_like(reward, -self.cfg.k_time), torch.zeros_like(reward))
 
         app = seen & self.prev_seen & ~stop
         reward += torch.where(
@@ -165,10 +168,10 @@ class BallPPOEnv(BallEnv):
             -0.5 * ((x - cx) / self.cfg.sig_x) ** 2
             -0.5 * ((d - self.cfg.stop_d) / self.cfg.sig_d) ** 2
         )
-        act_cost = torch.sum(self.actions * self.actions, dim=1)
+        stop_action = torch.max(torch.abs(self.actions), dim=1).values < self.cfg.stop_eps
         reward += torch.where(
-            stop,
-            self.cfg.r_stop_q * stop_q - self.cfg.k_stop_a * act_cost,
+            stop & stop_action,
+            self.cfg.r_stop * stop_q,
             torch.zeros_like(reward),
         )
 

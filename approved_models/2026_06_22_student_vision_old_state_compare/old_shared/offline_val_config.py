@@ -1,0 +1,16 @@
+run_name = 'old_shared_student'
+cv_model = 'old'
+state = 'shared'
+mode = 'student'
+num_envs = 32
+num_episodes = 1
+start = 0
+stride = 1
+episodes_per_checkpoint = 32
+val_steps = 0
+episode_s = 15.0
+seed = 1
+device = 'cuda:0'
+vision_model = 'old'
+vision_state = 'shared_feature'
+vision_ckpt = 'models/vision/cv_old/best.pt'

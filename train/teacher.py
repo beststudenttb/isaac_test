@@ -2,7 +2,7 @@
 
 Run from the project root:
 
-    ./IsaacLab/isaaclab.sh -p train/train_teacher.py
+    ./IsaacLab/isaaclab.sh -p train/teacher.py
 """
 
 from __future__ import annotations
@@ -125,6 +125,7 @@ def make_cfg() -> BallPPOEnvCfg:
     cfg = BallPPOEnvCfg()
     cfg.seed = int(teacher_cfg.SEED)
     cfg.episode_length_s = float(teacher_cfg.EPISODE_S)
+    cfg.stop_n = int(teacher_cfg.STOP_N)
     cfg.scene.num_envs = int(teacher_cfg.NUM_ENVS)
     cfg.sim.device = args_cli.device
     cfg.use_camera = bool(teacher_cfg.USE_CAMERA)

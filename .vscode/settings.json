@@ -1,0 +1,19 @@
+{
+  "files.watcherExclude": {
+    "**/models/**": true,
+    "**/data_isaac/**": true,
+    "**/camera_sweep_runs/**": true,
+    "**/approved_models/**": true,
+    "**/IsaacLab/**": true,
+    "**/__pycache__/**": true,
+    "**/.git/objects/**": true
+  },
+  "search.exclude": {
+    "**/models/**": true,
+    "**/data_isaac/**": true,
+    "**/camera_sweep_runs/**": true,
+    "**/approved_models/**": true,
+    "**/IsaacLab/**": true,
+    "**/__pycache__/**": true
+  }
+}

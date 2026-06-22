@@ -3,17 +3,18 @@
 from pathlib import Path
 
 
-OUT_DIR = Path("./models/student_ppo")  # student PPO 输出目录。
+OUT_DIR = Path("./models/rl/student_ppo")  # student PPO 输出目录。
 CLEAR_OUT_DIR = True  # 每次训练前清空 OUT_DIR。
 
-NUM_ENVS = 64  # 并行环境数量。
+NUM_ENVS = 32  # 并行环境数量。
 TOTAL_STEPS = 8_192_000  # 总采样步数，按 SB3 total_timesteps 语义。
 EPISODE_S = 15.0  # 单个 episode 最长仿真时间，单位秒。
+STOP_N = 3  # 连续多少 step stop 后 success done。
 SEED = 0  # 随机种子。
 DEVICE = None  # None 表示使用 IsaacLab 命令行 device。
-USE_CAMERA = True  # 复现阶段默认不用相机。
-READ_CAMERA = True  # 是否读取相机 RGB。
-TEACHER_PATH = "./models/teacher_ppo/best_val.zip"  # teacher SB3 PPO 模型路径。
+USE_CAMERA = False  # 复现阶段默认不用相机。
+READ_CAMERA = False  # 是否读取相机 RGB。
+TEACHER_PATH = "./models/rl/teacher_ppo/best_val.zip"  # teacher SB3 PPO 模型路径。
 TEACHER_LOSS = 0.0  # teacher imitation loss 权重；0 表示关闭。
 TEACHER_LOSS_MIN = 0.01  # teacher imitation loss 权重下限。
 TEACHER_DOWN_SUCCESS = 0.00  # 每次 val 后，按 success_rate 乘该值降低 teacher 权重。

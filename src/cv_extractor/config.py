@@ -9,7 +9,7 @@ BALL_VISION_CONFIG = {
 
 CV_XBIN_TRAIN_CONFIG = {
     "dataset_dir": "./data_isaac",
-    "output_dir": "./models/cv_reserve",
+    "output_dir": "./models/vision/cv_reserve",
     "updates": 1000,
     "batch_size": 64,
     "learning_rate": 1e-4,

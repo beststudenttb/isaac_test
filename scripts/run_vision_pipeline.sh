@@ -15,7 +15,7 @@ python scripts/train_cv_all.py \
   --batch-size 128 \
   --device cuda
 
-./IsaacLab/isaaclab.sh -p train/train_student_vision.py \
+./IsaacLab/isaaclab.sh -p train/student_vision.py \
   --cv-model old \
   --state xd \
   --student

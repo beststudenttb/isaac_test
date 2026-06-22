@@ -2,7 +2,7 @@
 
 Run from the project root:
 
-    ./IsaacLab/isaaclab.sh -p train/val_student_vision.py --cv-model old --state feature --student
+    ./IsaacLab/isaaclab.sh -p val/student_vision.py --cv-model old --state feature --student
 """
 
 from __future__ import annotations
@@ -36,6 +36,10 @@ STATE_ALIAS = {
 parser = argparse.ArgumentParser(description="Offline validate vision student update checkpoints.")
 parser.add_argument("--state", choices=["xd", "shared", "feature"], required=True)
 parser.add_argument("--cv-model", choices=["old", "old-m", "resnet", "mobile"], required=True)
+parser.add_argument("--num-envs", type=int, default=None)
+parser.add_argument("--num-episodes", type=int, default=int(cfg.NUM_EPISODES))
+parser.add_argument("--start", type=int, default=int(cfg.START))
+parser.add_argument("--stride", type=int, default=int(cfg.STRIDE))
 mode_group = parser.add_mutually_exclusive_group(required=True)
 mode_group.add_argument("--student", action="store_true")
 mode_group.add_argument("--teacher", action="store_true")
@@ -63,6 +67,7 @@ import torch.nn as nn
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src import task_cfg
 from src.cv_extractor.simple_cnn import BallVisionNet, MobileBallNet, OldBallVisionNet, OldMobileBallNet
 from src.ppo import ActorCritic
 from src.sb3_env import BallPPOEnv, BallPPOEnvCfg
@@ -85,6 +90,9 @@ VAL_FIELDS = [
     "checkpoint",
     "update",
     "step",
+    "num_envs",
+    "num_episodes",
+    "episodes",
     "success_rate",
     "fail_rate",
     "timeout_rate",
@@ -143,7 +151,8 @@ def make_env() -> BallPPOEnv:
     env_cfg = BallPPOEnvCfg()
     env_cfg.seed = int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
-    env_cfg.scene.num_envs = int(cfg.NUM_ENVS)
+    env_cfg.stop_n = int(cfg.STOP_N)
+    env_cfg.scene.num_envs = int(args_cli.num_envs) if args_cli.num_envs is not None else int(cfg.NUM_ENVS)
     env_cfg.sim.device = args_cli.device
     env_cfg.use_camera = True
     env_cfg.read_camera = True
@@ -169,7 +178,8 @@ def load_encoder(device: torch.device) -> nn.Module:
 def select_state(out: dict[str, torch.Tensor]) -> torch.Tensor:
     state = str(vision_choice()["state"])
     if state == "pred":
-        return torch.cat([out["x_pred"], out["distance_pred"]], dim=1)
+        dist = torch.clamp(out["distance_pred"] / float(task_cfg.FAIL_FAR), 0.0, 1.0)
+        return torch.cat([out["x_pred"], dist], dim=1)
     value = out[state]
     if value.ndim > 2:
         value = value.flatten(1)
@@ -247,54 +257,114 @@ def traj_row(
     }
 
 
+def fmt_value(value) -> str:
+    if isinstance(value, float):
+        if abs(value) >= 1000:
+            return f"{value:.0f}"
+        return f"{value:.3f}"
+    return str(value)
+
+
+def print_log(groups: list[tuple[str, list[tuple[str, object]]]]):
+    rows = []
+    for group, items in groups:
+        rows.append((f"{group}/", ""))
+        rows.extend((f"  {key}", fmt_value(value)) for key, value in items)
+    width_l = max(len(left) for left, _ in rows)
+    width_r = max(len(right) for _, right in rows)
+    line = "-" * (width_l + width_r + 7)
+    print(line)
+    for left, right in rows:
+        print(f"| {left:<{width_l}} | {right:>{width_r}} |")
+    print(line)
+
+
 def val(
     env: BallPPOEnv,
     encoder: nn.Module,
     model: ActorCritic,
+    num_episodes: int,
     update: int = -1,
     step: int = -1,
     traj_writer: csv.DictWriter | None = None,
+    env0_traj_writer: csv.DictWriter | None = None,
 ) -> dict:
-    env.reset()
-    obs_t = vision_obs(env, encoder)
     steps = int(cfg.VAL_STEPS) if int(cfg.VAL_STEPS) > 0 else int(env.max_episode_length)
-    done_once = torch.zeros(env.num_envs, device=env.device, dtype=torch.bool)
-    returns = torch.zeros(env.num_envs, device=env.device)
-    lengths = torch.zeros(env.num_envs, device=env.device)
-    success = torch.zeros(env.num_envs, device=env.device, dtype=torch.bool)
-    fail = torch.zeros(env.num_envs, device=env.device, dtype=torch.bool)
-    timeout = torch.zeros(env.num_envs, device=env.device, dtype=torch.bool)
+    episodes = env.num_envs * int(num_episodes)
+    success_count = 0
+    fail_count = 0
+    timeout_count = 0
+    return_sum = 0.0
+    len_sum = 0.0
 
     with torch.no_grad():
-        for t in range(steps):
-            action = model.predict(obs_t)
-            _obs, reward, terminated, truncated, _info = env.step(action)
-            active = ~done_once
-            returns[active] += reward[active]
-            lengths[active] += 1
-            done = (terminated | truncated) & active
-            if traj_writer is not None:
-                for env_id in torch.nonzero(active, as_tuple=False).flatten().tolist():
-                    traj_writer.writerow(
-                        traj_row(env, "offline_val", step, update, t, int(env_id), reward[int(env_id)], bool(done[int(env_id)]))
-                    )
-            if torch.any(done):
-                success[done] = env.last_success[done]
-                fail[done] = env.last_fail[done]
-                timeout[done] = env.last_timeout[done] | truncated[done]
-                done_once[done] = True
-                if bool(done_once.all()):
-                    break
+        for episode_id in range(int(num_episodes)):
+            env.reset()
             obs_t = vision_obs(env, encoder)
+            done_once = torch.zeros(env.num_envs, device=env.device, dtype=torch.bool)
+            returns = torch.zeros(env.num_envs, device=env.device)
+            lengths = torch.zeros(env.num_envs, device=env.device)
+            success = torch.zeros(env.num_envs, device=env.device, dtype=torch.bool)
+            fail = torch.zeros(env.num_envs, device=env.device, dtype=torch.bool)
+            timeout = torch.zeros(env.num_envs, device=env.device, dtype=torch.bool)
 
-    timeout[~done_once] = True
-    lengths[~done_once] = steps
+            for t in range(steps):
+                action = model.predict(obs_t)
+                _obs, reward, terminated, truncated, _info = env.step(action)
+                active = ~done_once
+                returns[active] += reward[active]
+                lengths[active] += 1
+                done = (terminated | truncated) & active
+                if traj_writer is not None:
+                    for env_id in torch.nonzero(active, as_tuple=False).flatten().tolist():
+                        traj_writer.writerow(
+                            traj_row(
+                                env,
+                                "offline_val",
+                                step,
+                                update,
+                                episode_id * steps + t,
+                                int(env_id),
+                                reward[int(env_id)],
+                                bool(done[int(env_id)]),
+                            )
+                        )
+                if env0_traj_writer is not None and bool(active[0].item()):
+                    env0_traj_writer.writerow(
+                        traj_row(
+                            env,
+                            "offline_val_env0",
+                            step,
+                            update,
+                            episode_id * steps + t,
+                            0,
+                            reward[0],
+                            bool(done[0]),
+                        )
+                    )
+                if torch.any(done):
+                    success[done] = env.last_success[done]
+                    fail[done] = env.last_fail[done]
+                    timeout[done] = env.last_timeout[done] | truncated[done]
+                    done_once[done] = True
+                    if bool(done_once.all()):
+                        break
+                obs_t = vision_obs(env, encoder)
+
+            timeout[~done_once] = True
+            lengths[~done_once] = steps
+            success_count += int(success.sum().item())
+            fail_count += int(fail.sum().item())
+            timeout_count += int(timeout.sum().item())
+            return_sum += float(returns.sum().cpu())
+            len_sum += float(lengths.sum().cpu())
+
     return {
-        "success_rate": float(success.float().mean().cpu()),
-        "fail_rate": float(fail.float().mean().cpu()),
-        "timeout_rate": float(timeout.float().mean().cpu()),
-        "mean_return": float(returns.mean().cpu()),
-        "mean_len": float(lengths.mean().cpu()),
+        "success_rate": success_count / episodes,
+        "fail_rate": fail_count / episodes,
+        "timeout_rate": timeout_count / episodes,
+        "mean_return": return_sum / episodes,
+        "mean_len": len_sum / episodes,
     }
 
 
@@ -305,6 +375,29 @@ def best_key(row: dict) -> tuple:
         -float(row["timeout_rate"]),
         float(row["mean_return"]),
     )
+
+
+def write_config(path: Path, env: BallPPOEnv):
+    choice = vision_choice()
+    lines = [
+        f"run_name = {run_name()!r}",
+        f"cv_model = {args_cli.cv_model!r}",
+        f"state = {args_cli.state!r}",
+        f"mode = {train_mode()!r}",
+        f"num_envs = {env.num_envs!r}",
+        f"num_episodes = {int(args_cli.num_episodes)!r}",
+        f"start = {int(args_cli.start)!r}",
+        f"stride = {int(args_cli.stride)!r}",
+        f"episodes_per_checkpoint = {env.num_envs * int(args_cli.num_episodes)!r}",
+        f"val_steps = {int(cfg.VAL_STEPS)!r}",
+        f"episode_s = {float(cfg.EPISODE_S)!r}",
+        f"seed = {int(cfg.SEED)!r}",
+        f"device = {env.device!r}",
+        f"vision_model = {str(choice['model'])!r}",
+        f"vision_state = {str(choice['state'])!r}",
+        f"vision_ckpt = {str(choice['ckpt'])!r}",
+    ]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def main():
@@ -320,37 +413,90 @@ def main():
     update_paths = sorted(update_dir.glob("update_*.pt"))
     if not update_paths:
         raise FileNotFoundError(f"no update checkpoints found: {update_dir}")
+    start = int(args_cli.start)
+    stride = int(args_cli.stride)
+    if stride <= 0:
+        raise ValueError(f"stride must be positive: {stride}")
+    update_paths = [
+        path for path in update_paths
+        if int(path.stem.split("_")[-1]) >= start
+        and (int(path.stem.split("_")[-1]) - start) % stride == 0
+    ]
+    if not update_paths:
+        raise FileNotFoundError(f"no update checkpoints found after start={start}, stride={stride}: {update_dir}")
 
     env = make_env()
     device = torch.device(env.device)
     encoder = load_encoder(device)
+    write_config(root / "offline_val_config.py", env)
     out_csv = root / "offline_val.csv"
+    env0_traj_csv = root / "traj_offline_env0.csv"
     best_row = None
     best_path = None
 
-    print(f"[INFO] offline val run={run_name()} updates={len(update_paths)} envs={env.num_envs} device={env.device}")
+    print(
+        f"[INFO] offline val run={run_name()} updates={len(update_paths)} "
+        f"envs={env.num_envs} num_episodes={args_cli.num_episodes} start={args_cli.start} "
+        f"stride={args_cli.stride} device={env.device}"
+    )
     try:
-        with out_csv.open("w", newline="", encoding="utf-8") as file:
+        mode = "a" if int(args_cli.start) > 0 else "w"
+        with out_csv.open(mode, newline="", encoding="utf-8") as file, env0_traj_csv.open(mode, newline="", encoding="utf-8") as env0_file:
             writer = csv.DictWriter(file, fieldnames=VAL_FIELDS)
-            writer.writeheader()
+            env0_writer = csv.DictWriter(env0_file, fieldnames=TRAJ_FIELDS)
+            if mode == "w":
+                writer.writeheader()
+                env0_writer.writeheader()
             for path in update_paths:
                 model, ckpt = load_model(path, device)
-                info = val(env, encoder, model)
+                update = int(ckpt.get("update", -1))
+                step = int(ckpt.get("step", -1))
+                info = val(
+                    env,
+                    encoder,
+                    model,
+                    int(args_cli.num_episodes),
+                    update,
+                    step,
+                    env0_traj_writer=env0_writer,
+                )
                 row = {
                     "checkpoint": path.name,
-                    "update": int(ckpt.get("update", -1)),
-                    "step": int(ckpt.get("step", -1)),
+                    "update": update,
+                    "step": step,
+                    "num_envs": env.num_envs,
+                    "num_episodes": int(args_cli.num_episodes),
+                    "episodes": env.num_envs * int(args_cli.num_episodes),
                     **info,
                 }
                 writer.writerow(row)
                 file.flush()
+                env0_file.flush()
                 if best_row is None or best_key(row) > best_key(best_row):
                     best_row = row
                     best_path = path
-                print(
-                    f"update={row['update']} step={row['step']} "
-                    f"succ={row['success_rate']:.3f} fail={row['fail_rate']:.3f} "
-                    f"timeout={row['timeout_rate']:.3f} return={row['mean_return']:.2f}"
+                print_log(
+                    [
+                        (
+                            "model",
+                            [
+                                ("checkpoint", row["checkpoint"]),
+                                ("update", row["update"]),
+                                ("step", row["step"]),
+                            ],
+                        ),
+                        (
+                            "val",
+                            [
+                                ("episodes", row["episodes"]),
+                                ("success", row["success_rate"]),
+                                ("fail", row["fail_rate"]),
+                                ("timeout", row["timeout_rate"]),
+                                ("return", row["mean_return"]),
+                                ("len", row["mean_len"]),
+                            ],
+                        ),
+                    ]
                 )
 
         if best_row is None or best_path is None:
@@ -368,6 +514,7 @@ def main():
                 env,
                 encoder,
                 best_model,
+                int(args_cli.num_episodes),
                 int(best_row["update"]),
                 int(best_row["step"]),
                 traj_writer,
