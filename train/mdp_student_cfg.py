@@ -28,10 +28,12 @@ MDP_BATCH_ENVS = 4  # 每次 MDP 更新抽多少个 env 的轨迹。
 MDP_SEQ_LEN = 16  # 每次 MDP 更新使用的连续轨迹长度。
 MDP_LR = 1e-5  # MDP 在线微调学习率。
 MDP_DYN_W = 1.0  # MDP z 动力学 loss 权重。
+MDP_CONTRAST_W = 0.0  # MDP transition contrastive loss 权重。
+MDP_CONTRAST_TAU = 0.1  # MDP contrastive softmax 温度。
+MDP_IDM_W = 0.0  # MDP 逆动力学 loss 权重。
 MDP_REWARD_W = 1.0  # MDP reward 预测 loss 权重。
 MDP_DONE_W = 0.2  # MDP done 预测 loss 权重。
 MDP_VALUE_W = 0.1  # MDP value 预测 loss 权重。
-MDP_VAR_W = 0.1  # MDP z 方差约束权重。
 
 TEACHER_PATH = "./models/rl/teacher_ppo/best_val.zip"  # teacher SB3 PPO 模型路径。
 TEACHER_LOSS = 1.0  # teacher imitation loss 权重；0 表示关闭。

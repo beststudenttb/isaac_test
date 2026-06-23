@@ -21,6 +21,7 @@ class MDPStateNet(nn.Module):
         hidden_dim: int = 128,
         pretrained: bool = True,
         freeze_backbone: bool = True,
+        train_layer3: bool = False,
     ):
         super().__init__()
         self.input_shape = tuple(input_shape)
@@ -30,6 +31,7 @@ class MDPStateNet(nn.Module):
         self.feature_dim = int(feature_dim)
         self.hidden_dim = int(hidden_dim)
         self.backbone_frozen = bool(freeze_backbone)
+        self.train_layer3 = bool(train_layer3)
 
         weights = ResNet18_Weights.DEFAULT if bool(pretrained) else None
         backbone = resnet18(weights=weights)
@@ -38,7 +40,10 @@ class MDPStateNet(nn.Module):
         self.layer2 = backbone.layer2
         self.layer3 = backbone.layer3
         if self.backbone_frozen:
-            for module in (self.stem, self.layer1, self.layer2, self.layer3):
+            frozen_modules = (self.stem, self.layer1, self.layer2)
+            if not self.train_layer3:
+                frozen_modules = frozen_modules + (self.layer3,)
+            for module in frozen_modules:
                 for param in module.parameters():
                     param.requires_grad_(False)
 
@@ -72,6 +77,11 @@ class MDPStateNet(nn.Module):
         self.value_head = nn.Sequential(nn.Linear(state_dim, h), nn.ReLU(), nn.Linear(h, 1))
         self.done_head = nn.Sequential(nn.Linear(state_dim + self.action_dim, h), nn.ReLU(), nn.Linear(h, 1))
         self.probe_head = nn.Sequential(nn.Linear(state_dim, h), nn.ReLU(), nn.Linear(h, 2))
+        self.inverse_head = nn.Sequential(
+            nn.Linear(self.z_dim * 2, h),
+            nn.ReLU(),
+            nn.Linear(h, self.action_dim),
+        )
 
         self.register_buffer(
             "imagenet_mean",
@@ -100,7 +110,11 @@ class MDPStateNet(nn.Module):
                 x = self.stem(x)
                 x = self.layer1(x)
                 x = self.layer2(x)
+            if self.train_layer3:
                 feature = self.layer3(x)
+            else:
+                with torch.no_grad():
+                    feature = self.layer3(x)
         else:
             x = self.stem(x)
             x = self.layer1(x)
@@ -178,6 +192,9 @@ class MDPStateNet(nn.Module):
             "done_logit": self.done_head(za),
             "next_value": self.value_head(next_state_feature),
         }
+
+    def inverse(self, z_img: torch.Tensor, next_z_img: torch.Tensor) -> torch.Tensor:
+        return self.inverse_head(torch.cat([z_img, next_z_img], dim=1))
 
     def forward(
         self,

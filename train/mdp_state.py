@@ -117,11 +117,11 @@ class MDPDataset(Dataset):
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train MDP latent state model.")
-    parser.add_argument("--data-dir", type=Path, default=Path(cfg.TRAIN_CFG["dataset_dir"]))
-    parser.add_argument("--out-dir", type=Path, default=Path(cfg.TRAIN_CFG["output_dir"]))
-    parser.add_argument("--updates", type=int, default=int(cfg.TRAIN_CFG["updates"]))
-    parser.add_argument("--batch-size", type=int, default=int(cfg.TRAIN_CFG["batch_size"]))
-    parser.add_argument("--seq-len", type=int, default=int(cfg.TRAIN_CFG["seq_len"]))
+    parser.add_argument("--data-dir", type=Path, default=cfg.DATASET_DIR)
+    parser.add_argument("--out-dir", type=Path, default=cfg.OUT_DIR)
+    parser.add_argument("--updates", type=int, default=int(cfg.UPDATES))
+    parser.add_argument("--batch-size", type=int, default=int(cfg.BATCH_SIZE))
+    parser.add_argument("--seq-len", type=int, default=int(cfg.SEQ_LEN))
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     return parser.parse_args()
 
@@ -143,9 +143,20 @@ def returns(reward: torch.Tensor, done: torch.Tensor, gamma: float) -> torch.Ten
     return out
 
 
-def var_loss(z: torch.Tensor) -> torch.Tensor:
-    std = torch.sqrt(z.float().var(dim=0) + 1e-4)
-    return F.relu(1.0 - std).mean()
+def transition_contrast(pred: torch.Tensor, target: torch.Tensor, tau: float) -> tuple[torch.Tensor, torch.Tensor]:
+    logits = pred @ target.t() / float(tau)
+    labels = torch.arange(pred.shape[0], device=pred.device)
+    loss = F.cross_entropy(logits, labels)
+    retrieval1 = (logits.argmax(dim=1) == labels).float().mean()
+    return loss, retrieval1
+
+
+def effective_rank(z: torch.Tensor) -> torch.Tensor:
+    z = z.float() - z.float().mean(dim=0, keepdim=True)
+    singular = torch.linalg.svdvals(z)
+    prob = singular / singular.sum().clamp_min(1e-8)
+    entropy = -(prob * prob.clamp_min(1e-8).log()).sum()
+    return entropy.exp()
 
 
 def train_step(model: MDPStateNet, batch: dict[str, torch.Tensor], device: torch.device) -> dict[str, torch.Tensor]:
@@ -154,14 +165,15 @@ def train_step(model: MDPStateNet, batch: dict[str, torch.Tensor], device: torch
     reward = batch["reward"].to(device)
     done = batch["done"].to(device)
     probe = batch["probe"].to(device)
-    ret = returns(reward, done, float(cfg.TRAIN_CFG["gamma"]))
+    ret = returns(reward, done, float(cfg.GAMMA))
 
     batch_size, seq_len = action.shape[:2]
     state = model.initial(batch_size, device)
-    prev_action = torch.zeros(batch_size, int(cfg.MODEL_CFG["action_dim"]), device=device)
+    prev_action = torch.zeros(batch_size, int(cfg.ACTION_DIM), device=device)
     obs = model.observe(image[:, 0], prev_action, state)
 
     dyn_losses = []
+    idm_losses = []
     reward_losses = []
     done_losses = []
     value_losses = []
@@ -169,64 +181,115 @@ def train_step(model: MDPStateNet, batch: dict[str, torch.Tensor], device: torch
     probe_x_errs = []
     probe_d_errs = []
     z_list = []
+    pred_list = []
+    target_list = []
 
     for t in range(seq_len):
         pred = model.imagine(obs, action[:, t])
         next_post = model.observe(image[:, t + 1], action[:, t], obs)
 
-        dyn_losses.append(F.smooth_l1_loss(pred["next_z_pred"], next_post["z"].detach()))
+        dyn_losses.append(F.smooth_l1_loss(pred["next_z_pred_unit"], next_post["z_unit"].detach()))
+        idm_losses.append(F.smooth_l1_loss(model.inverse(obs["z_img"], next_post["z_img"]), action[:, t]))
         reward_losses.append(F.smooth_l1_loss(pred["reward_pred"], reward[:, t]))
         done_losses.append(F.binary_cross_entropy_with_logits(pred["done_logit"], done[:, t]))
         value_losses.append(F.smooth_l1_loss(obs["value"], ret[:, t]))
-        probe_losses.append(F.smooth_l1_loss(obs["probe"], probe[:, t]))
-        probe_x_errs.append(((obs["probe"][:, 0:1] - probe[:, t, 0:1]).abs() * (IMAGE_WIDTH * 0.5)).mean())
-        probe_d_errs.append(((obs["probe"][:, 1:2] - probe[:, t, 1:2]).abs() * FAIL_FAR).mean())
+        probe_pred = obs["probe"]
+        probe_losses.append(F.smooth_l1_loss(probe_pred, probe[:, t]))
+        probe_x_errs.append(((probe_pred[:, 0:1] - probe[:, t, 0:1]).abs() * (IMAGE_WIDTH * 0.5)).mean())
+        probe_d_errs.append(((probe_pred[:, 1:2] - probe[:, t, 1:2]).abs() * FAIL_FAR).mean())
         z_list.append(obs["z"])
+        pred_list.append(pred["next_z_pred_unit"])
+        target_list.append(next_post["z_unit"].detach())
 
         keep = 1.0 - done[:, t]
         obs = {
             "belief": next_post["belief"] * keep,
             "z": next_post["z"] * keep,
+            "z_img": next_post["z_img"] * keep,
             "state_feature": next_post["state_feature"] * keep,
             "value": next_post["value"] * keep,
             "probe": next_post["probe"] * keep,
         }
 
     z_all = torch.cat(z_list, dim=0)
+    pred_all = torch.cat(pred_list, dim=0)
+    target_all = torch.cat(target_list, dim=0)
     dyn = torch.stack(dyn_losses).mean()
+    contrast, retrieval1 = transition_contrast(pred_all, target_all, float(cfg.CONTRAST_TAU))
+    idm = torch.stack(idm_losses).mean()
     rew = torch.stack(reward_losses).mean()
     done_loss = torch.stack(done_losses).mean()
     val = torch.stack(value_losses).mean()
     probe_loss = torch.stack(probe_losses).mean()
-    var = var_loss(z_all)
+    eff_rank = effective_rank(z_all.detach())
     loss = (
-        float(cfg.TRAIN_CFG["dyn_w"]) * dyn
-        + float(cfg.TRAIN_CFG["reward_w"]) * rew
-        + float(cfg.TRAIN_CFG["done_w"]) * done_loss
-        + float(cfg.TRAIN_CFG["value_w"]) * val
-        + float(cfg.TRAIN_CFG["probe_w"]) * probe_loss
-        + float(cfg.TRAIN_CFG["var_w"]) * var
+        float(cfg.DYN_W) * dyn
+        + float(cfg.CONTRAST_W) * contrast
+        + float(cfg.IDM_W) * idm
+        + float(cfg.REWARD_W) * rew
+        + float(cfg.DONE_W) * done_loss
+        + float(cfg.VALUE_W) * val
+        + float(cfg.PROBE_W) * probe_loss
     )
     return {
         "loss": loss,
         "dyn": dyn.detach(),
+        "contrast": contrast.detach(),
+        "idm": idm.detach(),
         "reward": rew.detach(),
         "done": done_loss.detach(),
         "value": val.detach(),
         "probe": probe_loss.detach(),
         "probe_x_err": torch.stack(probe_x_errs).mean().detach(),
         "probe_d_err": torch.stack(probe_d_errs).mean().detach(),
-        "var": var.detach(),
+        "retrieval1": retrieval1.detach(),
+        "eff_rank": eff_rank.detach(),
         "z_std": z_all.detach().float().std(dim=0).mean(),
     }
 
 
-def save(path: Path, model: MDPStateNet, update: int, info: dict[str, float]) -> None:
+def model_cfg() -> dict:
+    return {
+        "input_shape": cfg.INPUT_SHAPE,
+        "z_dim": int(cfg.Z_DIM),
+        "action_dim": int(cfg.ACTION_DIM),
+        "belief_dim": int(cfg.BELIEF_DIM),
+        "feature_dim": int(cfg.FEATURE_DIM),
+        "hidden_dim": int(cfg.HIDDEN_DIM),
+        "pretrained": bool(cfg.PRETRAINED),
+        "freeze_backbone": bool(cfg.FREEZE_BACKBONE),
+        "train_layer3": bool(cfg.TRAIN_LAYER3),
+    }
+
+
+def train_cfg(args: argparse.Namespace) -> dict:
+    return {
+        "dataset_dir": str(args.data_dir),
+        "output_dir": str(args.out_dir),
+        "batch_size": int(args.batch_size),
+        "seq_len": int(args.seq_len),
+        "updates": int(args.updates),
+        "learning_rate": float(cfg.LR),
+        "gamma": float(cfg.GAMMA),
+        "dyn_w": float(cfg.DYN_W),
+        "contrast_w": float(cfg.CONTRAST_W),
+        "contrast_tau": float(cfg.CONTRAST_TAU),
+        "idm_w": float(cfg.IDM_W),
+        "reward_w": float(cfg.REWARD_W),
+        "value_w": float(cfg.VALUE_W),
+        "done_w": float(cfg.DONE_W),
+        "probe_w": float(cfg.PROBE_W),
+        "save_every": int(cfg.SAVE_EVERY),
+        "seed": int(cfg.SEED),
+    }
+
+
+def save(path: Path, model: MDPStateNet, update: int, info: dict[str, float], run_cfg: dict) -> None:
     torch.save(
         {
             "model": model.state_dict(),
-            "model_cfg": cfg.MODEL_CFG,
-            "train_cfg": cfg.TRAIN_CFG,
+            "model_cfg": model_cfg(),
+            "train_cfg": run_cfg,
             "update": int(update),
             "info": info,
         },
@@ -236,19 +299,35 @@ def save(path: Path, model: MDPStateNet, update: int, info: dict[str, float]) ->
 
 def main() -> None:
     args = parse_args()
-    random.seed(int(cfg.TRAIN_CFG["seed"]))
-    torch.manual_seed(int(cfg.TRAIN_CFG["seed"]))
+    random.seed(int(cfg.SEED))
+    torch.manual_seed(int(cfg.SEED))
     device = pick_device(args.device)
+    run_cfg = train_cfg(args)
 
     if args.out_dir.exists():
         raise FileExistsError(f"output dir already exists: {args.out_dir}")
     args.out_dir.mkdir(parents=True)
     dataset = MDPDataset(args.data_dir, int(args.seq_len))
-    model = MDPStateNet(**cfg.MODEL_CFG).to(device)
-    opt = torch.optim.Adam(model.parameters(), lr=float(cfg.TRAIN_CFG["learning_rate"]))
+    model = MDPStateNet(**model_cfg()).to(device)
+    opt = torch.optim.Adam(model.parameters(), lr=float(cfg.LR))
 
     log_path = args.out_dir / "log.csv"
-    fields = ["update", "loss", "dyn", "reward", "done", "value", "probe", "probe_x_err", "probe_d_err", "var", "z_std"]
+    fields = [
+        "update",
+        "loss",
+        "dyn",
+        "contrast",
+        "idm",
+        "reward",
+        "done",
+        "value",
+        "probe",
+        "probe_x_err",
+        "probe_d_err",
+        "retrieval1",
+        "eff_rank",
+        "z_std",
+    ]
     with log_path.open("w", newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=fields)
         writer.writeheader()
@@ -272,14 +351,15 @@ def main() -> None:
             last = info
             print(
                 f"update={update} loss={info['loss']:.4f} dyn={info['dyn']:.4f} "
+                f"con={info['contrast']:.4f} idm={info['idm']:.4f} "
                 f"rew={info['reward']:.4f} done={info['done']:.4f} probe={info['probe']:.4f} "
                 f"probe_x={info['probe_x_err']:.2f}px probe_d={info['probe_d_err']:.2f}m "
-                f"var={info['var']:.4f} z_std={info['z_std']:.4f}"
+                f"retrieval1={info['retrieval1']:.3f} eff_rank={info['eff_rank']:.2f} z_std={info['z_std']:.4f}"
             )
-            if update % int(cfg.TRAIN_CFG["save_every"]) == 0:
-                save(args.out_dir / f"model_{update}.pt", model, update, info)
+            if update % int(cfg.SAVE_EVERY) == 0:
+                save(args.out_dir / f"model_{update}.pt", model, update, info, run_cfg)
 
-    save(args.out_dir / "last.pt", model, int(args.updates), last)
+    save(args.out_dir / "last.pt", model, int(args.updates), last, run_cfg)
     print(f"[INFO] saved {args.out_dir / 'last.pt'}")
 
 

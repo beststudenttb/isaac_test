@@ -2,7 +2,29 @@
 
 本项目是视觉强化学习机器人研究项目，从原 Webots + PPO + teacher guidance + imitation learning 路线迁移到 Isaac / IsaacLab，用于测试并行仿真、相机采集和后续视觉策略训练。整体走 train-by-cheat：特权信息 teacher PPO 训练视觉 student。
 
-当前阶段：teacher PPO、自写 student PPO、视觉 student 训练入口、视觉数据采集和 CV 预训练入口已就绪，正在把冻结 encoder 接入视觉 student 做第一版复现。
+当前阶段：teacher PPO、自写 student PPO、视觉 student 训练入口、视觉数据采集和 CV 预训练入口已就绪；当前重点转向 MDP-consistent visual representation 预训练。
+
+## 研究方向与总体框架（核心）
+
+研究目标是**纯视觉自监督表征学习**：学一个可作策略 state 的视觉潜在表征 `h_t = Encoder(o_t)`，目的不是把单个任务做到最优，而是学到**通用、物体中心、像可控 MDP state** 的表征，以支撑当前 docking 与未来目标不那么明确的任务（goal-conditioned、抓取取回等）。
+
+总体三段框架（递进，后段不一定做得到）：
+
+1. 特权信息 teacher 策略（已有）。
+2. CV 视觉表征预训练（当前阶段）。
+3. 带 LBC、且 CV 部分也参与训练的 end2end 联合模型（目标，存在做不到的风险）。
+
+已确定的边界与约定：
+
+- **RL 阶段除 reward 外不使用任何特权信息**：student 观测纯视觉，teacher BC 属训练期蒸馏、部署纯视觉（learn-by-cheat 形态）。
+- **下游策略走 model-free**，以保留泛化能力。
+- 研究关注**状态转移一致性**与“state 下能决定动作”，而非 px/dist 数值精度；**px/dist 仅作诊断探针评估表征可访问性，不作表征的主监督目标**。
+- 表征应保留连续相对位姿（距离 / bearing / 横向偏移 / 可见性 / 动作效果），以便后续把任务目标拼进 state 做 goal-conditioned 行为（如“球在左、停 3m”）；纯 px/dist 监督会得到**任务塌缩**表征，仅作对照基线（等价 cv_old）。
+
+未定（随摸索调整）：
+
+- CV 预训练是否使用特权信息：当前倾向只把 px/dist 用作 probe 诊断，不作为 encoder 主监督。
+- 表征损失当前已搭好 forward、IDM 和 transition contrastive 架构；具体权重仍按实验调整。
 
 当前主要方向：
 
@@ -15,6 +37,23 @@
 - 视觉训练当前临时使用 `balanced + DLSS performance(dlss_mode=0)`；采集脚本支持用参数指定渲染模式和抗锯齿模式。
 - `train/cv.py` 使用 `train/test/val = 7/2/1` 的语义：`train` 参与训练，`test` 用于训练过程评估和保存 best，`val` 只在 `--val` 时做最终查看。
 - `scripts/run_vision_pipeline.sh` 可顺序执行：采集 50000 张图像、训练四个 CV 模型、用 `old + xd` 接入视觉 student。
+
+## MDP 视觉表征方向（当前重点）
+
+目标是学习一个视觉 latent，使它满足：
+
+- `T(h_t, a_t) -> h_{t+1}`：动作条件下的 latent 转移一致。
+- `I(z_img_t, z_img_{t+1}) -> a_t`：逆动力学能从纯视觉 latent 变化中读出动作效果。
+- transition contrastive：预测的下一 latent 应更接近真实下一 latent，而不是 batch 内其他候选。
+- px/dist probe：只作为诊断头，输入处 detach，不把特权几何监督反传给 encoder。
+
+当前实现状态：
+
+1. `src/mdp_state.py` 中 `MDPStateNet` 包含 image encoder、GRU belief、posterior/prior z、forward dynamics、IDM、reward/value/done/probe heads。
+2. `train/mdp_state.py` 是离线 MDP 表征预训练入口；使用归一化 latent 做 forward dyn loss，记录 `contrast`、`idm`、`retrieval1`、`eff_rank` 和 probe 诊断。
+3. `train/mdp_student.py` 的在线 MDP 微调逻辑已同步到相同 loss 语义，后续接 PPO 时不需要再重新对齐。
+4. 新增 `inverse_head` 后旧 MDP checkpoint 不再完全匹配，新的 MDP 架构需要重新训练 checkpoint。
+5. 当前 contrastive 仍使用 batch 内展平负样本，可能包含同轨迹邻近帧的假负样本；先跑首轮实验，后续必要时改 masked InfoNCE。
 
 当前目录约定：
 

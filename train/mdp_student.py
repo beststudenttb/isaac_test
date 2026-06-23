@@ -108,10 +108,13 @@ LOG_FIELDS = [
     "mdp_update",
     "mdp_loss",
     "mdp_dyn",
+    "mdp_contrast",
+    "mdp_idm",
     "mdp_reward",
     "mdp_done",
     "mdp_value",
-    "mdp_var",
+    "mdp_retrieval1",
+    "mdp_eff_rank",
 ]
 
 VAL_FIELDS = [
@@ -272,9 +275,20 @@ def terminal_mdp_obs(
     return out["state_feature"]
 
 
-def mdp_var_loss(z: torch.Tensor) -> torch.Tensor:
-    std = torch.sqrt(z.float().var(dim=0) + 1e-4)
-    return torch.relu(1.0 - std).mean()
+def mdp_contrast_loss(pred: torch.Tensor, target: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    logits = pred @ target.t() / float(cfg.MDP_CONTRAST_TAU)
+    labels = torch.arange(pred.shape[0], device=pred.device)
+    loss = torch.nn.functional.cross_entropy(logits, labels)
+    retrieval1 = (logits.argmax(dim=1) == labels).float().mean()
+    return loss, retrieval1
+
+
+def mdp_effective_rank(z: torch.Tensor) -> torch.Tensor:
+    z = z.float() - z.float().mean(dim=0, keepdim=True)
+    singular = torch.linalg.svdvals(z)
+    prob = singular / singular.sum().clamp_min(1e-8)
+    entropy = -(prob * prob.clamp_min(1e-8).log()).sum()
+    return entropy.exp()
 
 
 def mdp_returns(reward: torch.Tensor, done: torch.Tensor) -> torch.Tensor:
@@ -317,24 +331,31 @@ def train_mdp_online(
         zero_action = torch.zeros(batch_size, int(mdp.action_dim), device=device)
         obs = mdp.observe(image[0], zero_action, state)
         dyn_losses = []
+        idm_losses = []
         reward_losses = []
         done_losses = []
         value_losses = []
         z_list = []
+        pred_list = []
+        target_list = []
 
         for t in range(action.shape[0]):
             pred = mdp.imagine(obs, action[t])
             next_post = mdp.observe(next_image[t], action[t], obs)
-            dyn_losses.append(torch.nn.functional.smooth_l1_loss(pred["next_z_pred"], next_post["z"].detach()))
+            dyn_losses.append(torch.nn.functional.smooth_l1_loss(pred["next_z_pred_unit"], next_post["z_unit"].detach()))
+            idm_losses.append(torch.nn.functional.smooth_l1_loss(mdp.inverse(obs["z_img"], next_post["z_img"]), action[t]))
             reward_losses.append(torch.nn.functional.smooth_l1_loss(pred["reward_pred"], reward[t]))
             done_losses.append(torch.nn.functional.binary_cross_entropy_with_logits(pred["done_logit"], done[t]))
             value_losses.append(torch.nn.functional.smooth_l1_loss(obs["value"], ret[:, t]))
             z_list.append(obs["z"])
+            pred_list.append(pred["next_z_pred_unit"])
+            target_list.append(next_post["z_unit"].detach())
 
             keep = 1.0 - done[t]
             obs = {
                 "belief": next_post["belief"] * keep,
                 "z": next_post["z"] * keep,
+                "z_img": next_post["z_img"] * keep,
                 "state_feature": next_post["state_feature"] * keep,
                 "value": next_post["value"] * keep,
                 "probe": next_post["probe"] * keep,
@@ -342,21 +363,26 @@ def train_mdp_online(
             if t + 1 < action.shape[0] and bool(done[t].any()):
                 reset_obs = mdp.observe(image[t + 1], zero_action, mdp.initial(batch_size, device))
                 mask = done[t]
-                for key in ("belief", "z", "state_feature", "value", "probe"):
+                for key in ("belief", "z", "z_img", "state_feature", "value", "probe"):
                     obs[key] = torch.where(mask, reset_obs[key], obs[key])
 
         z_all = torch.cat(z_list, dim=0)
+        pred_all = torch.cat(pred_list, dim=0)
+        target_all = torch.cat(target_list, dim=0)
         dyn = torch.stack(dyn_losses).mean()
+        contrast, retrieval1 = mdp_contrast_loss(pred_all, target_all)
+        idm = torch.stack(idm_losses).mean()
         rew = torch.stack(reward_losses).mean()
         done_loss = torch.stack(done_losses).mean()
         val = torch.stack(value_losses).mean()
-        var = mdp_var_loss(z_all)
+        eff_rank = mdp_effective_rank(z_all.detach())
         loss = (
             float(cfg.MDP_DYN_W) * dyn
+            + float(cfg.MDP_CONTRAST_W) * contrast
+            + float(cfg.MDP_IDM_W) * idm
             + float(cfg.MDP_REWARD_W) * rew
             + float(cfg.MDP_DONE_W) * done_loss
             + float(cfg.MDP_VALUE_W) * val
-            + float(cfg.MDP_VAR_W) * var
         )
         opt.zero_grad()
         loss.backward()
@@ -365,10 +391,13 @@ def train_mdp_online(
         info = {
             "mdp_loss": float(loss.detach().cpu()),
             "mdp_dyn": float(dyn.detach().cpu()),
+            "mdp_contrast": float(contrast.detach().cpu()),
+            "mdp_idm": float(idm.detach().cpu()),
             "mdp_reward": float(rew.detach().cpu()),
             "mdp_done": float(done_loss.detach().cpu()),
             "mdp_value": float(val.detach().cpu()),
-            "mdp_var": float(var.detach().cpu()),
+            "mdp_retrieval1": float(retrieval1.detach().cpu()),
+            "mdp_eff_rank": float(eff_rank.detach().cpu()),
         }
     return info
 
@@ -460,6 +489,7 @@ def save_mdp(path: Path, mdp: MDPStateNet, update: int, info: dict):
                 "hidden_dim": mdp.hidden_dim,
                 "pretrained": False,
                 "freeze_backbone": bool(cfg.FREEZE_MDP_BACKBONE),
+                "train_layer3": bool(getattr(mdp, "train_layer3", False)),
             },
             "update": int(update),
             "info": info,
@@ -693,10 +723,13 @@ def main():
             mdp_info = {
                 "mdp_loss": 0.0,
                 "mdp_dyn": 0.0,
+                "mdp_contrast": 0.0,
+                "mdp_idm": 0.0,
                 "mdp_reward": 0.0,
                 "mdp_done": 0.0,
                 "mdp_value": 0.0,
-                "mdp_var": 0.0,
+                "mdp_retrieval1": 0.0,
+                "mdp_eff_rank": 0.0,
             }
             if train_mdp_now:
                 loss = {"pi_loss": 0.0, "v_loss": 0.0, "teacher_loss": 0.0, "entropy": 0.0, "kl": 0.0}
@@ -815,10 +848,13 @@ def main():
             tb.add_scalar("mdp/update", info["mdp_update"], step_done)
             tb.add_scalar("mdp/loss", info["mdp_loss"], step_done)
             tb.add_scalar("mdp/dyn", info["mdp_dyn"], step_done)
+            tb.add_scalar("mdp/contrast", info["mdp_contrast"], step_done)
+            tb.add_scalar("mdp/idm", info["mdp_idm"], step_done)
             tb.add_scalar("mdp/reward", info["mdp_reward"], step_done)
             tb.add_scalar("mdp/done", info["mdp_done"], step_done)
             tb.add_scalar("mdp/value", info["mdp_value"], step_done)
-            tb.add_scalar("mdp/var", info["mdp_var"], step_done)
+            tb.add_scalar("mdp/retrieval1", info["mdp_retrieval1"], step_done)
+            tb.add_scalar("mdp/eff_rank", info["mdp_eff_rank"], step_done)
 
             if update % int(cfg.LOG_EVERY) == 0:
                 groups = [
@@ -861,6 +897,10 @@ def main():
                             ("update", info["mdp_update"]),
                             ("loss", info["mdp_loss"]),
                             ("dyn", info["mdp_dyn"]),
+                            ("con", info["mdp_contrast"]),
+                            ("idm", info["mdp_idm"]),
+                            ("retr", info["mdp_retrieval1"]),
+                            ("rank", info["mdp_eff_rank"]),
                         ],
                     ),
                 ]
