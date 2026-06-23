@@ -2,6 +2,7 @@
   "files.watcherExclude": {
     "**/models/**": true,
     "**/data_isaac/**": true,
+    "**/data_mdp*/**": true,
     "**/camera_sweep_runs/**": true,
     "**/approved_models/**": true,
     "**/IsaacLab/**": true,
@@ -11,6 +12,7 @@
   "search.exclude": {
     "**/models/**": true,
     "**/data_isaac/**": true,
+    "**/data_mdp*/**": true,
     "**/camera_sweep_runs/**": true,
     "**/approved_models/**": true,
     "**/IsaacLab/**": true,

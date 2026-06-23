@@ -3,6 +3,7 @@ __pycache__/
 
 IsaacLab/
 data_isaac/
+data_mdp*/
 models/
 camera_sweep_runs/
 camera_sweep*.mp4
