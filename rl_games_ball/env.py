@@ -89,6 +89,7 @@ class RlGamesBallEnvCfg(DirectRLEnvCfg):
     k_time = task_cfg.K_TIME
     k_x = task_cfg.K_X
     k_d = task_cfg.K_D
+    k_stop_da = task_cfg.K_STOP_DA
     sig_x = task_cfg.SIG_X
     sig_d = task_cfg.SIG_D
 
@@ -117,6 +118,7 @@ class RlGamesBallEnv(DirectRLEnv):
         self.prev_stop = torch.zeros(self.num_envs, device=self.device, dtype=torch.bool)
         self.prev_xe = torch.zeros(self.num_envs, device=self.device)
         self.prev_de = torch.zeros(self.num_envs, device=self.device)
+        self.prev_a_mag = torch.zeros(self.num_envs, device=self.device)
 
         self.last_success = torch.zeros(self.num_envs, device=self.device, dtype=torch.bool)
         self.last_fail = torch.zeros(self.num_envs, device=self.device, dtype=torch.bool)
@@ -266,6 +268,7 @@ class RlGamesBallEnv(DirectRLEnv):
         self.prev_stop[env_ids] = False
         self.prev_xe[env_ids] = 0.0
         self.prev_de[env_ids] = 0.0
+        self.prev_a_mag[env_ids] = 0.0
         self.sample_targets(env_ids)
         self.write_robot_pose(env_ids)
         self.write_head_pose(env_ids)
@@ -323,15 +326,17 @@ class RlGamesBallEnv(DirectRLEnv):
         reward = torch.zeros(self.num_envs, device=self.device)
         reward += torch.where(~seen, -self.cfg.k_search * (self.actions[:, 0] ** 2 + self.actions[:, 1] ** 2), 0.0)
         reward += torch.where(seen, torch.full_like(reward, -self.cfg.k_time), 0.0)
-        app = seen & self.prev_seen
+        a_mag = torch.max(torch.abs(self.actions), dim=1).values
+        app = seen & self.prev_seen & (~stop)
         reward += torch.where(app, self.cfg.k_x * (self.prev_xe - xe) + self.cfg.k_d * (self.prev_de - de), 0.0)
         reward += torch.where((~self.prev_seen) & seen, torch.full_like(reward, self.cfg.r_find), 0.0)
         reward += torch.where(self.prev_seen & (~seen), torch.full_like(reward, self.cfg.r_lost), 0.0)
         reward += torch.where((~self.prev_stop) & stop, torch.full_like(reward, self.cfg.r_stop_in), 0.0)
         reward += torch.where(self.prev_stop & (~stop), torch.full_like(reward, self.cfg.r_stop_out), 0.0)
+        reward += torch.where(stop & self.prev_stop, self.cfg.k_stop_da * (self.prev_a_mag - a_mag), 0.0)
 
         stop_q = torch.exp(-0.5 * ((x - cx) / self.cfg.sig_x) ** 2 - 0.5 * ((d - self.cfg.stop_d) / self.cfg.sig_d) ** 2)
-        stop_action = torch.max(torch.abs(self.actions), dim=1).values < self.cfg.stop_eps
+        stop_action = a_mag < self.cfg.stop_eps
         reward += torch.where(stop & stop_action, self.cfg.r_stop * stop_q, torch.zeros_like(reward))
 
         success = self.stop_steps >= self.cfg.stop_n
@@ -347,6 +352,7 @@ class RlGamesBallEnv(DirectRLEnv):
         self.prev_stop = stop
         self.prev_xe = torch.where(seen, xe, self.prev_xe)
         self.prev_de = torch.where(seen, de, self.prev_de)
+        self.prev_a_mag = a_mag
         return reward
 
     def compute_terminated(self) -> torch.Tensor:

@@ -46,9 +46,10 @@ HEAD_SPEED = np.pi / 2  # 头部最大角速度，单位 rad/s，默认 pi/2。
 
 K_SEARCH = 0.05  # search 阶段 x/y 平移动作惩罚系数。
 K_TIME = 0.01  # 看到球之后的每步时间惩罚系数，search 阶段不使用。
-K_X = 0.04  # approach 阶段 px_x 误差改善 reward 系数。
+K_X = 1.0  # approach 阶段 px_x 误差改善 reward 系数。
 K_D = 1.0  # approach 阶段 dist 误差改善 reward 系数。
 K_STOP_A = 0.5  # 保留参数；当前 stop 区域不再使用动作平方惩罚。
+K_STOP_DA = 1.0  # stop 区域内动作幅度变小的改善 reward 系数。
 
 SIG_X = 5.0  # stop 区域二维高斯的图像 x 标准差，单位 px。
 SIG_D = 0.1  # stop 区域二维高斯的距离标准差，单位 m。

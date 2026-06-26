@@ -46,6 +46,7 @@ K_SEARCH = 0.05
 K_TIME = 0.01
 K_X = 0.1
 K_D = 1.0
+K_STOP_DA = 1.0
 SIG_X = 5.0
 SIG_D = 0.1
 

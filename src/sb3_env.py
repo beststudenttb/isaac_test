@@ -29,6 +29,7 @@ class BallPPOEnvCfg(BallEnvCfg):
     k_x = task_cfg.K_X
     k_d = task_cfg.K_D
     k_stop_a = task_cfg.K_STOP_A
+    k_stop_da = task_cfg.K_STOP_DA
 
     sig_x = task_cfg.SIG_X
     sig_d = task_cfg.SIG_D
@@ -53,6 +54,7 @@ class BallPPOEnv(BallEnv):
         self.prev_stop = torch.zeros(self.num_envs, device=self.device, dtype=torch.bool)
         self.prev_xe = torch.zeros(self.num_envs, device=self.device)
         self.prev_de = torch.zeros(self.num_envs, device=self.device)
+        self.prev_a_mag = torch.zeros(self.num_envs, device=self.device)
         self.last_success = torch.zeros(self.num_envs, device=self.device, dtype=torch.bool)
         self.last_fail = torch.zeros(self.num_envs, device=self.device, dtype=torch.bool)
         self.last_timeout = torch.zeros(self.num_envs, device=self.device, dtype=torch.bool)
@@ -80,6 +82,7 @@ class BallPPOEnv(BallEnv):
             self.prev_stop[reset_ids] = False
             self.prev_xe[reset_ids] = 0.0
             self.prev_de[reset_ids] = 0.0
+            self.prev_a_mag[reset_ids] = 0.0
 
     def apply_actions(self, actions: torch.Tensor) -> None:
         actions = torch.clamp(actions, -1.0, 1.0)
@@ -152,7 +155,8 @@ class BallPPOEnv(BallEnv):
         )
         reward += torch.where(seen, torch.full_like(reward, -self.cfg.k_time), torch.zeros_like(reward))
 
-        app = seen & self.prev_seen & ~stop
+        a_mag = torch.max(torch.abs(self.actions), dim=1).values
+        app = seen & self.prev_seen & (~stop)
         reward += torch.where(
             app,
             self.cfg.k_x * (self.prev_xe - xe) + self.cfg.k_d * (self.prev_de - de),
@@ -163,12 +167,17 @@ class BallPPOEnv(BallEnv):
         reward += torch.where(self.prev_seen & (~seen), torch.full_like(reward, self.cfg.r_lost), 0.0)
         reward += torch.where((~self.prev_stop) & stop, torch.full_like(reward, self.cfg.r_stop_in), 0.0)
         reward += torch.where(self.prev_stop & (~stop), torch.full_like(reward, self.cfg.r_stop_out), 0.0)
+        reward += torch.where(
+            stop & self.prev_stop,
+            self.cfg.k_stop_da * (self.prev_a_mag - a_mag),
+            torch.zeros_like(reward),
+        )
 
         stop_q = torch.exp(
             -0.5 * ((x - cx) / self.cfg.sig_x) ** 2
             -0.5 * ((d - self.cfg.stop_d) / self.cfg.sig_d) ** 2
         )
-        stop_action = torch.max(torch.abs(self.actions), dim=1).values < self.cfg.stop_eps
+        stop_action = a_mag < self.cfg.stop_eps
         reward += torch.where(
             stop & stop_action,
             self.cfg.r_stop * stop_q,
@@ -188,6 +197,7 @@ class BallPPOEnv(BallEnv):
         self.prev_stop = stop
         self.prev_xe = torch.where(seen, xe, self.prev_xe)
         self.prev_de = torch.where(seen, de, self.prev_de)
+        self.prev_a_mag = a_mag
         return reward
 
     def compute_terminated(self) -> torch.Tensor:
