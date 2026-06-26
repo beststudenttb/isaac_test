@@ -151,6 +151,10 @@ def make_env() -> BallPPOEnv:
     cfg.sim.device = args_cli.device
     cfg.use_camera = bool(student_cfg.USE_CAMERA)
     cfg.read_camera = bool(student_cfg.READ_CAMERA)
+    cfg.end_d_min = float(student_cfg.END_D_MIN)
+    cfg.end_d_max = float(student_cfg.END_D_MAX)
+    cfg.end_x_min = float(student_cfg.END_X_MIN)
+    cfg.end_x_max = float(student_cfg.END_X_MAX)
     return BallPPOEnv(cfg)
 
 

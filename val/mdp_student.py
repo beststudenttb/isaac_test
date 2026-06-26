@@ -1,8 +1,8 @@
-"""Offline validate vision student update checkpoints.
+"""Offline validate MDP student update checkpoints.
 
 Run from the project root:
 
-    ./IsaacLab/isaaclab.sh -p val/student_vision.py --cv-model old --state feature --student
+    ./IsaacLab/isaaclab.sh -p val/mdp_student.py
 """
 
 from __future__ import annotations
@@ -16,40 +16,17 @@ from pathlib import Path
 
 from isaaclab.app import AppLauncher
 
-import student_vision_cfg as cfg
+import mdp_student_cfg as cfg
 
 
-CV_MODEL_ALIAS = {
-    "old": "old",
-    "old-m": "old-mobile",
-    "resnet": "resnet",
-    "mobile": "mobile",
-}
-
-STATE_ALIAS = {
-    "xd": "pred",
-    "shared": "shared_feature",
-    "feature": "reserve_feature",
-}
-
-
-parser = argparse.ArgumentParser(description="Offline validate vision student update checkpoints.")
-parser.add_argument("--state", choices=["xd", "shared", "feature"], required=True)
-parser.add_argument("--cv-model", choices=["old", "old-m", "resnet", "mobile"], required=True)
+parser = argparse.ArgumentParser(description="Offline validate MDP student update checkpoints.")
 parser.add_argument("--num-envs", type=int, default=None)
 parser.add_argument("--num-episodes", type=int, default=int(cfg.NUM_EPISODES))
 parser.add_argument("--start", type=int, default=int(cfg.START))
 parser.add_argument("--stride", type=int, default=int(cfg.STRIDE))
-mode_group = parser.add_mutually_exclusive_group(required=True)
-mode_group.add_argument("--student", action="store_true")
-mode_group.add_argument("--teacher", action="store_true")
+parser.add_argument("--mdp", type=Path, default=None)
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
-
-cli_model = CV_MODEL_ALIAS[str(args_cli.cv_model)]
-cli_state = STATE_ALIAS[str(args_cli.state)]
-if not any(str(item["model"]) == cli_model and str(item["state"]) == cli_state for item in cfg.VISION_CHOICES.values()):
-    raise ValueError(f"state={args_cli.state} is not available for cv-model={args_cli.cv_model}")
 
 if cfg.DEVICE is not None:
     args_cli.device = cfg.DEVICE
@@ -64,13 +41,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+import isaaclab.sim as sim_utils
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src import task_cfg
-from src.cv_extractor.simple_cnn import BallVisionNet, MobileBallNet, OldBallVisionNet, OldMobileBallNet
+from src.cv_extractor.mdp_state import MDPStateNet
+from src.mdp_student_env import MDPStudentEnv, MDPStudentEnvCfg, make_mdp_student_env
 from src.ppo import ActorCritic
-from src.sb3_env import BallPPOEnv, BallPPOEnvCfg
 
 
 ACTIVATIONS = {
@@ -79,16 +57,11 @@ ACTIVATIONS = {
     "elu": nn.ELU,
 }
 
-VISION_MODELS = {
-    "resnet": BallVisionNet,
-    "mobile": MobileBallNet,
-    "old": OldBallVisionNet,
-    "old-mobile": OldMobileBallNet,
-}
-
 VAL_FIELDS = [
     "checkpoint",
+    "mdp_checkpoint",
     "update",
+    "mdp_update",
     "step",
     "num_envs",
     "num_episodes",
@@ -124,99 +97,94 @@ TRAJ_FIELDS = [
 ]
 
 
-def train_mode() -> str:
-    if args_cli.student:
-        return "student"
-    return "teacher"
+def root_dir() -> Path:
+    return Path(cfg.OUT_DIR)
 
 
-def vision_choice() -> dict:
-    model = CV_MODEL_ALIAS[str(args_cli.cv_model)]
-    state = STATE_ALIAS[str(args_cli.state)]
-    for choice in cfg.VISION_CHOICES.values():
-        if str(choice["model"]) == model and str(choice["state"]) == state:
-            return choice
-    raise ValueError(f"state={args_cli.state} is not available for cv-model={args_cli.cv_model}")
+def update_num(path: Path) -> int:
+    return int(path.stem.split("_")[-1])
 
 
-def run_name() -> str:
-    return f"{args_cli.cv_model}_{args_cli.state}_{train_mode()}"
-
-
-def run_dir() -> Path:
-    return Path(cfg.OUT_DIR) / run_name()
-
-
-def make_env() -> BallPPOEnv:
-    env_cfg = BallPPOEnvCfg()
+def make_env() -> MDPStudentEnv:
+    env_cfg = MDPStudentEnvCfg()
     env_cfg.seed = int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
     env_cfg.stop_n = int(cfg.STOP_N)
     env_cfg.scene.num_envs = int(args_cli.num_envs) if args_cli.num_envs is not None else int(cfg.NUM_ENVS)
     env_cfg.sim.device = args_cli.device
-    env_cfg.use_camera = True
-    env_cfg.read_camera = True
+    render_kwargs = {
+        "rendering_mode": str(cfg.RENDERING_MODE),
+        "antialiasing_mode": str(cfg.ANTIALIASING_MODE),
+        "enable_dlssg": False,
+    }
+    if cfg.DLSS_MODE is not None:
+        render_kwargs["dlss_mode"] = int(cfg.DLSS_MODE)
+    env_cfg.sim.render = sim_utils.RenderCfg(**render_kwargs)
     env_cfg.num_rerenders_on_reset = int(cfg.RERENDER_ON_RESET)
     env_cfg.end_d_min = float(cfg.END_D_MIN)
     env_cfg.end_d_max = float(cfg.END_D_MAX)
     env_cfg.end_x_min = float(cfg.END_X_MIN)
     env_cfg.end_x_max = float(cfg.END_X_MAX)
-    return BallPPOEnv(env_cfg)
+    return make_mdp_student_env(env_cfg)
 
 
-def load_encoder(device: torch.device) -> nn.Module:
-    choice = vision_choice()
-    path = Path(choice["ckpt"])
-    if not path.exists():
-        raise FileNotFoundError(f"vision checkpoint not found: {path}")
-    model_cls = VISION_MODELS[str(choice["model"])]
+def camera_rgb(env: MDPStudentEnv) -> torch.Tensor:
+    image = env.camera.data.output["rgb"]
+    if image.shape[-1] > 3:
+        image = image[..., :3]
+    return image
+
+
+def load_mdp(path: Path, device: torch.device) -> MDPStateNet:
     ckpt = torch.load(path, map_location=device)
-    model = model_cls(pretrained=False).to(device)
-    model.load_state_dict(ckpt["model_state_dict"])
+    model = MDPStateNet(**ckpt["model_cfg"]).to(device)
+    model.load_state_dict(ckpt["model"])
     model.eval()
-    for param in model.parameters():
-        param.requires_grad_(False)
+    if bool(cfg.FREEZE_MDP_BACKBONE):
+        for module in (model.stem, model.layer1, model.layer2, model.layer3):
+            for param in module.parameters():
+                param.requires_grad_(False)
     return model
 
 
-def select_state(out: dict[str, torch.Tensor]) -> torch.Tensor:
-    state = str(vision_choice()["state"])
-    if state == "pred":
-        dist = torch.clamp(out["distance_pred"] / float(task_cfg.FAIL_FAR), 0.0, 1.0)
-        return torch.cat([out["x_pred"], dist], dim=1)
-    value = out[state]
-    if value.ndim > 2:
-        value = value.flatten(1)
-    return value
-
-
-def encode_image(image: torch.Tensor, encoder: nn.Module) -> torch.Tensor:
-    if image.shape[-1] > 3:
-        image = image[..., :3]
+def mdp_observe(
+    mdp: MDPStateNet,
+    image: torch.Tensor,
+    prev_action: torch.Tensor,
+    prev_state: dict[str, torch.Tensor] | None,
+) -> dict[str, torch.Tensor]:
     with torch.no_grad():
-        if bool(cfg.ENCODER_FP16) and image.is_cuda:
-            with torch.autocast(device_type="cuda", dtype=torch.float16):
-                out = encoder(image)
-        else:
-            out = encoder(image)
-    return select_state(out).float().detach()
+        out = mdp.observe(image, prev_action, prev_state)
+    return {
+        "belief": out["belief"].detach(),
+        "z": out["z"].detach(),
+        "state_feature": out["state_feature"].float().detach(),
+    }
 
 
-def policy_obs(feature: torch.Tensor, end_obs: torch.Tensor) -> torch.Tensor:
-    return torch.cat((feature, end_obs), dim=-1)
+def next_mdp_state(
+    mdp: MDPStateNet,
+    env: MDPStudentEnv,
+    prev_state: dict[str, torch.Tensor],
+    action: torch.Tensor,
+    done: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    state = {
+        "belief": prev_state["belief"].clone(),
+        "z": prev_state["z"].clone(),
+    }
+    prev_action = action.clone()
+    if torch.any(done):
+        state["belief"][done] = 0.0
+        state["z"][done] = 0.0
+        prev_action[done] = 0.0
+    return mdp_observe(mdp, camera_rgb(env), prev_action, state)
 
 
-def vision_obs(env: BallPPOEnv, encoder: nn.Module) -> torch.Tensor:
-    if env.camera is None:
-        raise RuntimeError("vision val requires env camera")
-    return policy_obs(encode_image(env.camera.data.output["rgb"], encoder), env.end_obs())
-
-
-def load_model(path: Path, device: torch.device) -> tuple[ActorCritic, dict]:
-    choice = vision_choice()
+def load_policy(path: Path, obs_dim: int, device: torch.device) -> tuple[ActorCritic, dict]:
     ckpt = torch.load(path, map_location=device)
     model = ActorCritic(
-        obs_dim=int(choice["dim"]) + 2,
+        obs_dim=obs_dim,
         act_dim=3,
         pi_hidden=list(cfg.POLICY_NET),
         vf_hidden=list(cfg.VALUE_NET),
@@ -229,7 +197,7 @@ def load_model(path: Path, device: torch.device) -> tuple[ActorCritic, dict]:
 
 
 def traj_row(
-    env: BallPPOEnv,
+    env: MDPStudentEnv,
     phase: str,
     step: int,
     update: int,
@@ -279,24 +247,24 @@ def print_log(groups: list[tuple[str, list[tuple[str, object]]]]):
         rows.append((f"{group}/", ""))
         rows.extend((f"  {key}", fmt_value(value)) for key, value in items)
     width_l = max(len(left) for left, _ in rows)
-    width_r = max(len(right) for _, right in rows)
+    width_r = max(len(str(right)) for _, right in rows)
     line = "-" * (width_l + width_r + 7)
     print(line)
     for left, right in rows:
-        print(f"| {left:<{width_l}} | {right:>{width_r}} |")
+        print(f"| {left:<{width_l}} | {fmt_value(right):>{width_r}} |")
     print(line)
 
 
 def val(
-    env: BallPPOEnv,
-    encoder: nn.Module,
+    env: MDPStudentEnv,
+    mdp: MDPStateNet,
     model: ActorCritic,
     num_episodes: int,
-    update: int = -1,
-    step: int = -1,
+    update: int,
+    step: int,
     traj_writer: csv.DictWriter | None = None,
     env0_traj_writer: csv.DictWriter | None = None,
-) -> dict:
+) -> dict[str, float]:
     steps = int(cfg.VAL_STEPS) if int(cfg.VAL_STEPS) > 0 else int(env.max_episode_length)
     episodes = env.num_envs * int(num_episodes)
     success_count = 0
@@ -304,11 +272,15 @@ def val(
     timeout_count = 0
     return_sum = 0.0
     len_sum = 0.0
+    zero_action = torch.zeros(env.num_envs, int(env.cfg.action_space), device=env.device)
 
+    model.eval()
+    mdp.eval()
     with torch.no_grad():
         for episode_id in range(int(num_episodes)):
             env.reset()
-            obs_t = vision_obs(env, encoder)
+            mdp_state = mdp_observe(mdp, camera_rgb(env), zero_action, None)
+            obs_t = env.mdp_policy_obs(mdp_state)
             done_once = torch.zeros(env.num_envs, device=env.device, dtype=torch.bool)
             returns = torch.zeros(env.num_envs, device=env.device)
             lengths = torch.zeros(env.num_envs, device=env.device)
@@ -323,32 +295,15 @@ def val(
                 returns[active] += reward[active]
                 lengths[active] += 1
                 done = (terminated | truncated) & active
+                row_t = episode_id * steps + t
                 if traj_writer is not None:
                     for env_id in torch.nonzero(active, as_tuple=False).flatten().tolist():
                         traj_writer.writerow(
-                            traj_row(
-                                env,
-                                "offline_val",
-                                step,
-                                update,
-                                episode_id * steps + t,
-                                int(env_id),
-                                reward[int(env_id)],
-                                bool(done[int(env_id)]),
-                            )
+                            traj_row(env, "offline_val", step, update, row_t, int(env_id), reward[int(env_id)], bool(done[int(env_id)]))
                         )
                 if env0_traj_writer is not None and bool(active[0].item()):
                     env0_traj_writer.writerow(
-                        traj_row(
-                            env,
-                            "offline_val_env0",
-                            step,
-                            update,
-                            episode_id * steps + t,
-                            0,
-                            reward[0],
-                            bool(done[0]),
-                        )
+                        traj_row(env, "offline_val_env0", step, update, row_t, 0, reward[0], bool(done[0]))
                     )
                 if torch.any(done):
                     success[done] = env.last_success[done]
@@ -357,7 +312,8 @@ def val(
                     done_once[done] = True
                     if bool(done_once.all()):
                         break
-                obs_t = vision_obs(env, encoder)
+                mdp_state = next_mdp_state(mdp, env, mdp_state, action, terminated | truncated)
+                obs_t = env.mdp_policy_obs(mdp_state)
 
             timeout[~done_once] = True
             lengths[~done_once] = steps
@@ -385,13 +341,44 @@ def best_key(row: dict) -> tuple:
     )
 
 
-def write_config(path: Path, env: BallPPOEnv):
-    choice = vision_choice()
+def pick_mdp(policy_update: int, mdp_paths: list[Path], policy_ckpt: dict, base_mdp_path: Path) -> Path:
+    valid = [path for path in mdp_paths if update_num(path) <= int(policy_update)]
+    if valid:
+        return valid[-1]
+    if base_mdp_path.exists():
+        return base_mdp_path
+    path = Path(policy_ckpt["mdp_path"])
+    if not path.exists():
+        raise FileNotFoundError(f"MDP checkpoint not found: {base_mdp_path}")
+    return path
+
+
+def mdp_path_from_row(root: Path, row: dict, base_mdp_path: Path) -> Path:
+    if int(row["mdp_update"]) > 0:
+        return root / "mdp_updates" / row["mdp_checkpoint"]
+    return base_mdp_path
+
+
+def load_existing_best(root: Path, out_csv: Path, base_mdp_path: Path) -> tuple[dict | None, Path | None, Path | None]:
+    if not out_csv.exists():
+        return None, None, None
+    best_row = None
+    with out_csv.open("r", newline="", encoding="utf-8") as file:
+        for row in csv.DictReader(file):
+            if best_row is None or best_key(row) > best_key(best_row):
+                best_row = row
+    if best_row is None:
+        return None, None, None
+    return (
+        best_row,
+        root / "updates" / best_row["checkpoint"],
+        mdp_path_from_row(root, best_row, base_mdp_path),
+    )
+
+
+def write_config(path: Path, env: MDPStudentEnv):
     lines = [
-        f"run_name = {run_name()!r}",
-        f"cv_model = {args_cli.cv_model!r}",
-        f"state = {args_cli.state!r}",
-        f"mode = {train_mode()!r}",
+        f"run_name = 'mdp_student'",
         f"num_envs = {env.num_envs!r}",
         f"num_episodes = {int(args_cli.num_episodes)!r}",
         f"start = {int(args_cli.start)!r}",
@@ -399,11 +386,9 @@ def write_config(path: Path, env: BallPPOEnv):
         f"episodes_per_checkpoint = {env.num_envs * int(args_cli.num_episodes)!r}",
         f"val_steps = {int(cfg.VAL_STEPS)!r}",
         f"episode_s = {float(cfg.EPISODE_S)!r}",
+        f"stop_n = {int(cfg.STOP_N)!r}",
         f"seed = {int(cfg.SEED)!r}",
         f"device = {env.device!r}",
-        f"vision_model = {str(choice['model'])!r}",
-        f"vision_state = {str(choice['state'])!r}",
-        f"vision_ckpt = {str(choice['ckpt'])!r}",
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -414,38 +399,44 @@ def main():
     np.random.seed(seed)
     torch.manual_seed(seed)
 
-    root = run_dir()
+    root = root_dir()
     update_dir = root / "updates"
+    mdp_update_dir = root / "mdp_updates"
     if not update_dir.exists():
         raise FileNotFoundError(f"update dir not found: {update_dir}")
-    update_paths = sorted(update_dir.glob("update_*.pt"))
-    if not update_paths:
-        raise FileNotFoundError(f"no update checkpoints found: {update_dir}")
+
+    policy_paths = sorted(update_dir.glob("update_*.pt"))
+    mdp_paths = sorted(mdp_update_dir.glob("update_*.pt")) if mdp_update_dir.exists() else []
+    base_mdp_path = args_cli.mdp or Path(cfg.MDP_PATH)
+    if not mdp_paths and not base_mdp_path.exists():
+        raise FileNotFoundError(f"MDP checkpoint not found: {base_mdp_path}")
+    if not policy_paths:
+        raise FileNotFoundError(f"no policy checkpoints found: {update_dir}")
     start = int(args_cli.start)
     stride = int(args_cli.stride)
     if stride <= 0:
         raise ValueError(f"stride must be positive: {stride}")
-    update_paths = [
-        path for path in update_paths
-        if int(path.stem.split("_")[-1]) >= start
-        and (int(path.stem.split("_")[-1]) - start) % stride == 0
+    policy_paths = [
+        path for path in policy_paths
+        if update_num(path) >= start and (update_num(path) - start) % stride == 0
     ]
-    if not update_paths:
-        raise FileNotFoundError(f"no update checkpoints found after start={start}, stride={stride}: {update_dir}")
+    if not policy_paths:
+        raise FileNotFoundError(f"no policy checkpoints found after start={start}, stride={stride}: {update_dir}")
 
     env = make_env()
     device = torch.device(env.device)
-    encoder = load_encoder(device)
     write_config(root / "offline_val_config.py", env)
     out_csv = root / "offline_val.csv"
     env0_traj_csv = root / "traj_offline_env0.csv"
     best_row = None
-    best_path = None
+    best_policy_path = None
+    best_mdp_path = None
+    if start > 0:
+        best_row, best_policy_path, best_mdp_path = load_existing_best(root, out_csv, base_mdp_path)
 
     print(
-        f"[INFO] offline val run={run_name()} updates={len(update_paths)} "
-        f"envs={env.num_envs} num_episodes={args_cli.num_episodes} start={args_cli.start} "
-        f"stride={args_cli.stride} device={env.device}"
+        f"[INFO] offline val run=mdp_student policies={len(policy_paths)} mdp_updates={len(mdp_paths)} "
+        f"start={start} stride={stride} envs={env.num_envs} episodes={args_cli.num_episodes} device={env.device}"
     )
     try:
         mode = "a" if int(args_cli.start) > 0 else "w"
@@ -455,13 +446,20 @@ def main():
             if mode == "w":
                 writer.writeheader()
                 env0_writer.writeheader()
-            for path in update_paths:
-                model, ckpt = load_model(path, device)
-                update = int(ckpt.get("update", -1))
-                step = int(ckpt.get("step", -1))
+
+            for policy_path in policy_paths:
+                policy_update = update_num(policy_path)
+                policy_ckpt = torch.load(policy_path, map_location="cpu")
+                mdp_path = pick_mdp(policy_update, mdp_paths, policy_ckpt, base_mdp_path)
+                mdp = load_mdp(mdp_path, device)
+                obs_dim = int(mdp.belief_dim + mdp.z_dim + 2)
+                model, _ckpt = load_policy(policy_path, obs_dim, device)
+                update = int(policy_ckpt.get("update", policy_update))
+                step = int(policy_ckpt.get("step", -1))
+                mdp_update = update_num(mdp_path) if mdp_path.parent.name == "mdp_updates" else 0
                 info = val(
                     env,
-                    encoder,
+                    mdp,
                     model,
                     int(args_cli.num_episodes),
                     update,
@@ -469,8 +467,10 @@ def main():
                     env0_traj_writer=env0_writer,
                 )
                 row = {
-                    "checkpoint": path.name,
+                    "checkpoint": policy_path.name,
+                    "mdp_checkpoint": mdp_path.name,
                     "update": update,
+                    "mdp_update": mdp_update,
                     "step": step,
                     "num_envs": env.num_envs,
                     "num_episodes": int(args_cli.num_episodes),
@@ -482,14 +482,15 @@ def main():
                 env0_file.flush()
                 if best_row is None or best_key(row) > best_key(best_row):
                     best_row = row
-                    best_path = path
+                    best_policy_path = policy_path
+                    best_mdp_path = mdp_path
                 print_log(
                     [
                         (
                             "model",
                             [
-                                ("checkpoint", row["checkpoint"]),
                                 ("update", row["update"]),
+                                ("mdp_update", row["mdp_update"]),
                                 ("step", row["step"]),
                             ],
                         ),
@@ -507,20 +508,24 @@ def main():
                     ]
                 )
 
-        if best_row is None or best_path is None:
+        if best_row is None or best_policy_path is None or best_mdp_path is None:
             raise RuntimeError("offline val did not produce best checkpoint")
-        shutil.copy2(best_path, root / "best_offline.pt")
+        shutil.copy2(best_policy_path, root / "best_offline.pt")
+        if best_mdp_path.parent.name == "mdp_updates":
+            shutil.copy2(best_mdp_path, root / "best_offline_mdp.pt")
         (root / "best_offline_info.txt").write_text(
             "\n".join(f"{key} = {value}" for key, value in best_row.items()) + "\n",
             encoding="utf-8",
         )
-        best_model, _best_ckpt = load_model(best_path, device)
+
+        best_mdp = load_mdp(best_mdp_path, device)
+        best_model, _ = load_policy(best_policy_path, int(best_mdp.belief_dim + best_mdp.z_dim), device)
         with (root / "traj_best_offline.csv").open("w", newline="", encoding="utf-8") as traj_file:
             traj_writer = csv.DictWriter(traj_file, fieldnames=TRAJ_FIELDS)
             traj_writer.writeheader()
             val(
                 env,
-                encoder,
+                best_mdp,
                 best_model,
                 int(args_cli.num_episodes),
                 int(best_row["update"]),
@@ -528,8 +533,8 @@ def main():
                 traj_writer,
             )
         print(
-            f"[INFO] best checkpoint={best_path.name} success={best_row['success_rate']:.3f} "
-            f"fail={best_row['fail_rate']:.3f} timeout={best_row['timeout_rate']:.3f}"
+            f"[INFO] best checkpoint={best_policy_path.name} mdp={best_mdp_path.name} "
+            f"success={best_row['success_rate']:.3f} fail={best_row['fail_rate']:.3f} timeout={best_row['timeout_rate']:.3f}"
         )
     finally:
         env.close()

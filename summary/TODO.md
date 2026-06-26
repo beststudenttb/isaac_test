@@ -23,6 +23,7 @@
 
 - 先跑冻结 encoder + `old + xd` 的视觉 student，确认能否复现特权 student 的基本行为。
 - 对比 `xd`、`shared`、`feature` 作为 PPO state 的效果。
+- 周末批量跑 `old+xd`、`old+shared`、`MDP student`，离线评估使用 `stride=10`；下周对比 success 曲线、best update 和失败轨迹。
 - 引入视觉 student 前再次确认 `student_obs` / `priv_obs` 分离方案。
 - MDP latent 接入 RL 前提醒用户决定 ResNet backbone 是否继续冻结、只解冻 `layer3`，还是全量解冻。
 

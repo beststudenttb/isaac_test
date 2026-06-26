@@ -272,6 +272,10 @@ def make_env() -> BallPPOEnv:
     env_cfg.use_camera = True
     env_cfg.read_camera = True
     env_cfg.num_rerenders_on_reset = int(cfg.RERENDER_ON_RESET)
+    env_cfg.end_d_min = float(cfg.END_D_MIN)
+    env_cfg.end_d_max = float(cfg.END_D_MAX)
+    env_cfg.end_x_min = float(cfg.END_X_MIN)
+    env_cfg.end_x_max = float(cfg.END_X_MAX)
     return BallPPOEnv(env_cfg)
 
 
@@ -316,10 +320,14 @@ def encode_image(image: torch.Tensor, encoder: nn.Module) -> torch.Tensor:
     return select_state(out).float().detach()
 
 
+def policy_obs(feature: torch.Tensor, end_obs: torch.Tensor) -> torch.Tensor:
+    return torch.cat((feature, end_obs), dim=-1)
+
+
 def vision_obs(env: BallPPOEnv, encoder: nn.Module) -> torch.Tensor:
     if env.camera is None:
         raise RuntimeError("vision student requires env camera")
-    return encode_image(env.camera.data.output["rgb"], encoder)
+    return policy_obs(encode_image(env.camera.data.output["rgb"], encoder), env.end_obs())
 
 
 def save_env0_image(env: BallPPOEnv):
@@ -388,10 +396,8 @@ def teacher_actions(teacher, priv_obs: torch.Tensor) -> torch.Tensor | None:
         return None
     actions, _ = teacher.predict(priv_obs.detach().cpu().numpy(), deterministic=True)
     actions = torch.as_tensor(actions, device=priv_obs.device, dtype=priv_obs.dtype)
-    x_ok = torch.abs(priv_obs[:, 0]) <= float(task_cfg.STOP_X_TOL) / (float(task_cfg.IMAGE_WIDTH) * 0.5)
-    d_ok = torch.abs(priv_obs[:, 1] - float(task_cfg.STOP_D) / float(task_cfg.FAIL_FAR)) <= (
-        float(task_cfg.STOP_D_TOL) / float(task_cfg.FAIL_FAR)
-    )
+    x_ok = torch.abs(priv_obs[:, 0] - priv_obs[:, 3]) <= float(task_cfg.STOP_X_TOL) / (float(task_cfg.IMAGE_WIDTH) * 0.5)
+    d_ok = torch.abs(priv_obs[:, 1] - priv_obs[:, 2]) <= float(task_cfg.STOP_D_TOL) / float(task_cfg.FAIL_FAR)
     actions[x_ok & d_ok] = 0.0
     return actions
 
@@ -552,7 +558,7 @@ def main():
     activation = ACTIVATIONS[str(cfg.ACTIVATION)]
     choice = vision_choice()
     model = ActorCritic(
-        obs_dim=int(choice["dim"]),
+        obs_dim=int(choice["dim"]) + 2,
         act_dim=int(env.cfg.action_space),
         pi_hidden=list(cfg.POLICY_NET),
         vf_hidden=list(cfg.VALUE_NET),
@@ -571,8 +577,8 @@ def main():
     obs, _ = env.reset()
     priv_t = obs["policy"]
     obs_t = vision_obs(env, encoder)
-    if obs_t.shape[-1] != int(choice["dim"]):
-        raise ValueError(f"vision feature dim {obs_t.shape[-1]} != configured dim {choice['dim']}")
+    if obs_t.shape[-1] != int(choice["dim"]) + 2:
+        raise ValueError(f"vision obs dim {obs_t.shape[-1]} != configured dim {int(choice['dim']) + 2}")
 
     best = -1.0
     last_info = {}
@@ -599,7 +605,7 @@ def main():
             rollout = Rollout(
                 steps=int(cfg.N_STEPS),
                 envs=env.num_envs,
-                obs_dim=int(choice["dim"]),
+                obs_dim=int(choice["dim"]) + 2,
                 act_dim=int(env.cfg.action_space),
                 device=device,
             )
@@ -622,8 +628,13 @@ def main():
                 if has_timeout:
                     if env.last_rgb is None:
                         raise RuntimeError("timeout visual bootstrap requires env.last_rgb")
+                    if env.terminal_end_obs is None:
+                        raise RuntimeError("timeout visual bootstrap requires env.terminal_end_obs")
                     with torch.no_grad():
-                        terminal_obs = encode_image(env.last_rgb[timeout], encoder)
+                        terminal_obs = policy_obs(
+                            encode_image(env.last_rgb[timeout], encoder),
+                            env.terminal_end_obs[timeout],
+                        )
                         terminal_value = model.critic(terminal_obs).squeeze(-1)
                     reward = reward.clone()
                     reward[timeout] += float(cfg.GAMMA) * terminal_value

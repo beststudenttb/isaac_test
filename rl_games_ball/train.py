@@ -19,6 +19,8 @@ parser.add_argument("--cfg", type=Path, default=Path("rl_games_ball/rl_games_ppo
 parser.add_argument("--num-envs", type=int, default=None)
 parser.add_argument("--max-epochs", type=int, default=None)
 parser.add_argument("--checkpoint", type=str, default=None)
+parser.add_argument("--play", action="store_true")
+parser.add_argument("--games-num", type=int, default=None)
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -62,6 +64,8 @@ def main():
     params = agent_cfg["params"]
     if args_cli.max_epochs is not None:
         params["config"]["max_epochs"] = int(args_cli.max_epochs)
+    if args_cli.games_num is not None:
+        params["config"]["player"]["games_num"] = int(args_cli.games_num)
     if args_cli.checkpoint is not None:
         params["load_checkpoint"] = True
         params["load_path"] = str(args_cli.checkpoint)
@@ -83,7 +87,14 @@ def main():
     runner = Runner(IsaacAlgoObserver())
     runner.load(agent_cfg)
     runner.reset()
-    runner.run({"train": True, "play": False})
+    if args_cli.play:
+        if args_cli.checkpoint is None:
+            raise ValueError("--play requires --checkpoint")
+        runner.run({"train": False, "play": True, "checkpoint": str(args_cli.checkpoint)})
+    elif args_cli.checkpoint is not None:
+        runner.run({"train": True, "play": False, "checkpoint": str(args_cli.checkpoint)})
+    else:
+        runner.run({"train": True, "play": False})
     env.close()
 
 

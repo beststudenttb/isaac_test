@@ -39,13 +39,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.callbacks import BaseCallback
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.sb3_env import BallPPOEnvCfg, make_sb3_env
-from src.val_callback import TrainTrajCallback, ValCallback
+from src.val_callback import TrainTrajCallback
 
 
 ACTIVATIONS = {
@@ -74,6 +74,10 @@ def write_config(out_dir: Path):
         f"seed = {int(teacher_cfg.SEED)}",
         f"use_camera = {bool(teacher_cfg.USE_CAMERA)}",
         f"read_camera = {bool(teacher_cfg.READ_CAMERA)}",
+        f"end_d_min = {float(teacher_cfg.END_D_MIN)}",
+        f"end_d_max = {float(teacher_cfg.END_D_MAX)}",
+        f"end_x_min = {float(teacher_cfg.END_X_MIN)}",
+        f"end_x_max = {float(teacher_cfg.END_X_MAX)}",
         f"n_steps = {int(teacher_cfg.N_STEPS)}",
         f"batch_size = {int(teacher_cfg.BATCH_SIZE)}",
         f"n_epochs = {int(teacher_cfg.N_EPOCHS)}",
@@ -105,14 +109,9 @@ def write_config(out_dir: Path):
         f"optimizer_eps = {float(teacher_cfg.OPTIMIZER_EPS)}",
         f"rollout_buffer_class = {teacher_cfg.ROLLOUT_BUFFER_CLASS!r}",
         f"rollout_buffer_kwargs = {teacher_cfg.ROLLOUT_BUFFER_KWARGS!r}",
-        f"save_every = {int(teacher_cfg.SAVE_EVERY)}",
+        f"save_update_every = {int(teacher_cfg.SAVE_UPDATE_EVERY)}",
         f"save_train_traj = {bool(teacher_cfg.SAVE_TRAIN_TRAJ)}",
-        f"save_val_traj = {bool(teacher_cfg.SAVE_VAL_TRAJ)}",
-        f"val_every_rollouts = {int(teacher_cfg.VAL_EVERY_ROLLOUTS)}",
-        f"val_max_steps = {int(teacher_cfg.VAL_MAX_STEPS)}",
-        f"save_best = {bool(teacher_cfg.SAVE_BEST)}",
-        f"best_warmup_steps = {int(teacher_cfg.BEST_WARMUP_STEPS)}",
-        f"best_margin = {float(teacher_cfg.BEST_MARGIN)}",
+        "offline_val = 'val/teacher.py'",
         f"log_interval = {int(teacher_cfg.LOG_INTERVAL)}",
         f"verbose = {int(teacher_cfg.VERBOSE)}",
         f"progress = {bool(teacher_cfg.PROGRESS)}",
@@ -130,6 +129,10 @@ def make_cfg() -> BallPPOEnvCfg:
     cfg.sim.device = args_cli.device
     cfg.use_camera = bool(teacher_cfg.USE_CAMERA)
     cfg.read_camera = bool(teacher_cfg.READ_CAMERA)
+    cfg.end_d_min = float(teacher_cfg.END_D_MIN)
+    cfg.end_d_max = float(teacher_cfg.END_D_MAX)
+    cfg.end_x_min = float(teacher_cfg.END_X_MIN)
+    cfg.end_x_max = float(teacher_cfg.END_X_MAX)
     return cfg
 
 
@@ -158,6 +161,38 @@ def policy_kwargs() -> dict:
     }
 
 
+class UpdateSaveCallback(BaseCallback):
+    def __init__(self, out_dir: Path, every: int):
+        super().__init__()
+        self.update_dir = out_dir / "updates"
+        self.every = int(every)
+        self.rollout = 0
+        self.saved = 0
+
+    def _on_training_start(self) -> None:
+        self.update_dir.mkdir(parents=True, exist_ok=True)
+
+    def _on_step(self) -> bool:
+        return True
+
+    def _on_rollout_start(self) -> None:
+        self.save_pending()
+
+    def _on_rollout_end(self) -> None:
+        self.rollout += 1
+
+    def save_pending(self) -> None:
+        if self.every <= 0:
+            return
+        if self.rollout <= self.saved:
+            return
+        if self.rollout % self.every != 0:
+            self.saved = self.rollout
+            return
+        self.model.save(self.update_dir / f"update_{self.rollout:06d}")
+        self.saved = self.rollout
+
+
 def main():
     seed = int(teacher_cfg.SEED)
     random.seed(seed)
@@ -169,31 +204,12 @@ def main():
 
     env = make_sb3_env(make_cfg(), fast_variant=True)
     callbacks = []
+    update_save = None
     if bool(teacher_cfg.SAVE_TRAIN_TRAJ):
         callbacks.append(TrainTrajCallback(out_dir))
-    if int(teacher_cfg.SAVE_EVERY) > 0:
-        save_freq = max(int(teacher_cfg.SAVE_EVERY) // int(teacher_cfg.NUM_ENVS), 1)
-        callbacks.append(
-            CheckpointCallback(
-                save_freq=save_freq,
-                save_path=str(out_dir),
-                name_prefix="teacher",
-                verbose=1,
-            )
-        )
-    if int(teacher_cfg.VAL_EVERY_ROLLOUTS) > 0:
-        callbacks.append(
-            ValCallback(
-                out_dir=out_dir,
-                every_rollouts=int(teacher_cfg.VAL_EVERY_ROLLOUTS),
-                max_steps=int(teacher_cfg.VAL_MAX_STEPS),
-                warmup_steps=int(teacher_cfg.BEST_WARMUP_STEPS),
-                margin=float(teacher_cfg.BEST_MARGIN),
-                save_best=bool(teacher_cfg.SAVE_BEST),
-                save_traj=bool(teacher_cfg.SAVE_VAL_TRAJ),
-            )
-        )
-
+    if int(teacher_cfg.SAVE_UPDATE_EVERY) > 0:
+        update_save = UpdateSaveCallback(out_dir, int(teacher_cfg.SAVE_UPDATE_EVERY))
+        callbacks.append(update_save)
     model = PPO(
         teacher_cfg.POLICY,
         env,
@@ -234,6 +250,8 @@ def main():
             log_interval=int(teacher_cfg.LOG_INTERVAL),
             progress_bar=bool(teacher_cfg.PROGRESS),
         )
+        if update_save is not None:
+            update_save.save_pending()
         model.save(out_dir / "last")
         print(f"[INFO] saved {out_dir / 'last.zip'}")
     finally:

@@ -17,6 +17,10 @@ SEED = 1  # 随机种子。
 DEVICE = None  # None 表示使用 IsaacLab 命令行 device。
 RERENDER_ON_RESET = 1  # reset 后重渲染次数。
 ENCODER_FP16 = True  # 冻结 encoder 前向使用 fp16 autocast。
+END_D_MIN = 1.5  # state/reward 里的停止距离最小值，单位 m。
+END_D_MAX = 1.5  # state/reward 里的停止距离最大值，单位 m。
+END_X_MIN = 0.0  # state/reward 里的图像停止位置最小值，单位 px，0 表示图像中心。
+END_X_MAX = 0.0  # state/reward 里的图像停止位置最大值，单位 px。
 
 POLICY_NET = [64, 64]  # actor hidden sizes。
 VALUE_NET = [64, 64]  # critic hidden sizes。

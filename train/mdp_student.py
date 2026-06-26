@@ -47,7 +47,7 @@ from torch.utils.tensorboard import SummaryWriter
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.mdp_state import MDPStateNet
+from src.cv_extractor.mdp_state import MDPStateNet
 from src.mdp_student_env import MDPStudentEnv, MDPStudentEnvCfg, make_mdp_student_env
 from src.ppo import ActorCritic, Rollout, ppo_update
 from src import task_cfg
@@ -110,6 +110,8 @@ LOG_FIELDS = [
     "mdp_dyn",
     "mdp_contrast",
     "mdp_idm",
+    "mdp_var",
+    "mdp_cov",
     "mdp_reward",
     "mdp_done",
     "mdp_value",
@@ -174,6 +176,10 @@ def make_env():
         render_kwargs["dlss_mode"] = int(cfg.DLSS_MODE)
     env_cfg.sim.render = sim_utils.RenderCfg(**render_kwargs)
     env_cfg.num_rerenders_on_reset = int(cfg.RERENDER_ON_RESET)
+    env_cfg.end_d_min = float(cfg.END_D_MIN)
+    env_cfg.end_d_max = float(cfg.END_D_MAX)
+    env_cfg.end_x_min = float(cfg.END_X_MIN)
+    env_cfg.end_x_max = float(cfg.END_X_MAX)
     return make_mdp_student_env(env_cfg)
 
 
@@ -232,10 +238,8 @@ def teacher_actions(teacher, priv_obs: torch.Tensor) -> torch.Tensor | None:
         return None
     actions, _ = teacher.predict(priv_obs.detach().cpu().numpy(), deterministic=True)
     actions = torch.as_tensor(actions, device=priv_obs.device, dtype=priv_obs.dtype)
-    x_ok = torch.abs(priv_obs[:, 0]) <= float(task_cfg.STOP_X_TOL) / (float(task_cfg.IMAGE_WIDTH) * 0.5)
-    d_ok = torch.abs(priv_obs[:, 1] - float(task_cfg.STOP_D) / float(task_cfg.FAIL_FAR)) <= (
-        float(task_cfg.STOP_D_TOL) / float(task_cfg.FAIL_FAR)
-    )
+    x_ok = torch.abs(priv_obs[:, 0] - priv_obs[:, 3]) <= float(task_cfg.STOP_X_TOL) / (float(task_cfg.IMAGE_WIDTH) * 0.5)
+    d_ok = torch.abs(priv_obs[:, 1] - priv_obs[:, 2]) <= float(task_cfg.STOP_D_TOL) / float(task_cfg.FAIL_FAR)
     actions[x_ok & d_ok] = 0.0
     return actions
 
@@ -272,7 +276,7 @@ def terminal_mdp_obs(
         "z": prev_state["z"][timeout],
     }
     out = mdp_observe(mdp, env.last_rgb[timeout], action[timeout], state)
-    return out["state_feature"]
+    return torch.cat((out["state_feature"], env.terminal_end_obs[timeout]), dim=-1)
 
 
 def mdp_contrast_loss(pred: torch.Tensor, target: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -289,6 +293,20 @@ def mdp_effective_rank(z: torch.Tensor) -> torch.Tensor:
     prob = singular / singular.sum().clamp_min(1e-8)
     entropy = -(prob * prob.clamp_min(1e-8).log()).sum()
     return entropy.exp()
+
+
+def mdp_vicreg_var(z: torch.Tensor, gamma: float) -> torch.Tensor:
+    std = torch.sqrt(z.float().var(dim=0) + 1e-4)
+    return torch.relu(float(gamma) - std).mean()
+
+
+def mdp_vicreg_cov(z: torch.Tensor) -> torch.Tensor:
+    z = z.float()
+    z = z - z.mean(dim=0, keepdim=True)
+    n = max(z.shape[0] - 1, 1)
+    cov = (z.t() @ z) / n
+    off_diag_sq = cov.pow(2).sum() - cov.diagonal().pow(2).sum()
+    return off_diag_sq / z.shape[1]
 
 
 def mdp_returns(reward: torch.Tensor, done: torch.Tensor) -> torch.Tensor:
@@ -362,9 +380,11 @@ def train_mdp_online(
             }
             if t + 1 < action.shape[0] and bool(done[t].any()):
                 reset_obs = mdp.observe(image[t + 1], zero_action, mdp.initial(batch_size, device))
-                mask = done[t]
+                mask = done[t].squeeze(-1).bool()
                 for key in ("belief", "z", "z_img", "state_feature", "value", "probe"):
-                    obs[key] = torch.where(mask, reset_obs[key], obs[key])
+                    merged = obs[key].clone()
+                    merged[mask] = reset_obs[key][mask]
+                    obs[key] = merged
 
         z_all = torch.cat(z_list, dim=0)
         pred_all = torch.cat(pred_list, dim=0)
@@ -376,10 +396,14 @@ def train_mdp_online(
         done_loss = torch.stack(done_losses).mean()
         val = torch.stack(value_losses).mean()
         eff_rank = mdp_effective_rank(z_all.detach())
+        var = mdp_vicreg_var(z_all, float(cfg.MDP_VAR_GAMMA))
+        cov = mdp_vicreg_cov(z_all)
         loss = (
             float(cfg.MDP_DYN_W) * dyn
             + float(cfg.MDP_CONTRAST_W) * contrast
             + float(cfg.MDP_IDM_W) * idm
+            + float(cfg.MDP_VAR_W) * var
+            + float(cfg.MDP_COV_W) * cov
             + float(cfg.MDP_REWARD_W) * rew
             + float(cfg.MDP_DONE_W) * done_loss
             + float(cfg.MDP_VALUE_W) * val
@@ -393,6 +417,8 @@ def train_mdp_online(
             "mdp_dyn": float(dyn.detach().cpu()),
             "mdp_contrast": float(contrast.detach().cpu()),
             "mdp_idm": float(idm.detach().cpu()),
+            "mdp_var": float(var.detach().cpu()),
+            "mdp_cov": float(cov.detach().cpu()),
             "mdp_reward": float(rew.detach().cpu()),
             "mdp_done": float(done_loss.detach().cpu()),
             "mdp_value": float(val.detach().cpu()),
@@ -510,7 +536,7 @@ def val(
     env.reset()
     zero_action = torch.zeros(env.num_envs, int(env.cfg.action_space), device=env.device)
     mdp_state = mdp_observe(mdp, camera_rgb(env), zero_action, None)
-    obs_t = mdp_state["state_feature"]
+    obs_t = env.mdp_policy_obs(mdp_state)
     steps = int(max_steps) if int(max_steps) > 0 else int(env.max_episode_length)
     done_once = torch.zeros(env.num_envs, device=env.device, dtype=torch.bool)
     returns = torch.zeros(env.num_envs, device=env.device)
@@ -541,7 +567,7 @@ def val(
                 if bool(done_once.all()):
                     break
             mdp_state = next_mdp_state(mdp, env, mdp_state, action, terminated | truncated)
-            obs_t = mdp_state["state_feature"]
+            obs_t = env.mdp_policy_obs(mdp_state)
     model.train()
     timeout[~done_once] = True
     lengths[~done_once] = steps
@@ -587,7 +613,7 @@ def main():
     device = torch.device(env.device)
     mdp = load_mdp(device)
     teacher = load_teacher(device)
-    obs_dim = int(mdp.belief_dim + mdp.z_dim)
+    obs_dim = int(mdp.belief_dim + mdp.z_dim + 2)
     write_config(log_dir, args_cli.mdp or Path(cfg.MDP_PATH), obs_dim)
     log_file, log_writer = open_csv(log_dir / "log.csv", LOG_FIELDS)
     val_file, val_writer = open_csv(log_dir / "val.csv", VAL_FIELDS)
@@ -614,6 +640,7 @@ def main():
     mdp_opt = torch.optim.Adam((param for param in mdp.parameters() if param.requires_grad), lr=float(cfg.MDP_LR), eps=1e-5)
     teacher_coef = float(cfg.TEACHER_LOSS)
     teacher_min = float(cfg.TEACHER_LOSS_MIN)
+    teacher_down_mdp = float(cfg.TEACHER_DOWN_MDP)
     teacher_down_success = float(cfg.TEACHER_DOWN_SUCCESS)
     teacher_up_out = float(cfg.TEACHER_UP_OUT)
     teacher_up_timeout = float(cfg.TEACHER_UP_TIMEOUT)
@@ -622,7 +649,7 @@ def main():
     priv_t = obs["policy"]
     zero_action = torch.zeros(env.num_envs, int(env.cfg.action_space), device=device)
     mdp_state = mdp_observe(mdp, camera_rgb(env), zero_action, None)
-    obs_t = mdp_state["state_feature"]
+    obs_t = env.mdp_policy_obs(mdp_state)
 
     steps_per_update = env.num_envs * int(cfg.N_STEPS)
     total_steps = int(cfg.TOTAL_STEPS)
@@ -703,7 +730,7 @@ def main():
                     fail_count += int((env.last_fail & done).sum().item())
                     timeout_count += int(((env.last_timeout | truncated) & done).sum().item())
                 mdp_state = next_mdp_state(mdp, env, mdp_state, action, done)
-                obs_t = mdp_state["state_feature"]
+                obs_t = env.mdp_policy_obs(mdp_state)
                 priv_t = obs_next["policy"]
 
             with torch.no_grad():
@@ -725,6 +752,8 @@ def main():
                 "mdp_dyn": 0.0,
                 "mdp_contrast": 0.0,
                 "mdp_idm": 0.0,
+                "mdp_var": 0.0,
+                "mdp_cov": 0.0,
                 "mdp_reward": 0.0,
                 "mdp_done": 0.0,
                 "mdp_value": 0.0,
@@ -743,6 +772,7 @@ def main():
                     done_buf,
                 )
                 save_mdp(mdp_update_dir / f"update_{update:06d}.pt", mdp, update, mdp_info)
+                teacher_coef = max(teacher_coef - teacher_down_mdp, teacher_min)
             else:
                 loss = ppo_update(
                     model=model,
@@ -818,13 +848,14 @@ def main():
                 obs, _ = env.reset()
                 priv_t = obs["policy"]
                 mdp_state = mdp_observe(mdp, camera_rgb(env), zero_action, None)
-                obs_t = mdp_state["state_feature"]
+                obs_t = env.mdp_policy_obs(mdp_state)
                 if bool(cfg.SAVE_BEST) and update >= int(cfg.BEST_WARMUP):
                     rate = val_info["success_rate"]
                     if rate >= best + float(cfg.BEST_MARGIN):
                         best = rate
                         save_model(log_dir / "best.pt", model, opt, update, step_done, best, teacher_coef, val_row)
-                        save_mdp(log_dir / "best_mdp.pt", mdp, update, val_row)
+                        if bool(cfg.TRAIN_MDP):
+                            save_mdp(log_dir / "best_mdp.pt", mdp, update, val_row)
                         (log_dir / "best_info.txt").write_text(
                             "\n".join(f"{key} = {value}" for key, value in val_row.items()) + "\n",
                             encoding="utf-8",
@@ -850,6 +881,8 @@ def main():
             tb.add_scalar("mdp/dyn", info["mdp_dyn"], step_done)
             tb.add_scalar("mdp/contrast", info["mdp_contrast"], step_done)
             tb.add_scalar("mdp/idm", info["mdp_idm"], step_done)
+            tb.add_scalar("mdp/var", info["mdp_var"], step_done)
+            tb.add_scalar("mdp/cov", info["mdp_cov"], step_done)
             tb.add_scalar("mdp/reward", info["mdp_reward"], step_done)
             tb.add_scalar("mdp/done", info["mdp_done"], step_done)
             tb.add_scalar("mdp/value", info["mdp_value"], step_done)
@@ -899,6 +932,8 @@ def main():
                             ("dyn", info["mdp_dyn"]),
                             ("con", info["mdp_contrast"]),
                             ("idm", info["mdp_idm"]),
+                            ("var", info["mdp_var"]),
+                            ("cov", info["mdp_cov"]),
                             ("retr", info["mdp_retrieval1"]),
                             ("rank", info["mdp_eff_rank"]),
                         ],
@@ -918,7 +953,8 @@ def main():
                 print_log(groups)
 
         save_model(log_dir / "last.pt", model, opt, updates, total_steps, best, teacher_coef, last_info)
-        save_mdp(log_dir / "last_mdp.pt", mdp, updates, last_info)
+        if bool(cfg.TRAIN_MDP):
+            save_mdp(log_dir / "last_mdp.pt", mdp, updates, last_info)
         print(f"[INFO] saved {log_dir / 'last.pt'}")
     finally:
         tb.close()

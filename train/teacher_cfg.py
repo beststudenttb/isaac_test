@@ -15,6 +15,11 @@ DEVICE = None  # None 表示使用 IsaacLab 默认或命令行 --device。
 USE_CAMERA = False  # 是否在 teacher 训练环境里启用相机。
 READ_CAMERA = False  # 是否每 step 读取相机 RGB，用来测试视觉开销。
 
+END_D_MIN = 1.5  # teacher state/reward 里的停止距离最小值，单位 m。
+END_D_MAX = 1.5  # teacher state/reward 里的停止距离最大值，单位 m。
+END_X_MIN = 0.0  # teacher state/reward 里的图像停止位置最小值，单位 px，0 表示图像中心。
+END_X_MAX = 0.0  # teacher state/reward 里的图像停止位置最大值，单位 px。
+
 N_STEPS = 64  # PPO 每个 env 每次 rollout 的 step 数。
 BATCH_SIZE = 1024  # PPO minibatch 大小。
 N_EPOCHS = 10  # 每批 rollout 重复优化次数。
@@ -47,14 +52,8 @@ OPTIMIZER_EPS = 1e-5  # Adam eps。
 ROLLOUT_BUFFER_CLASS = None  # 默认 RolloutBuffer。
 ROLLOUT_BUFFER_KWARGS = None  # 默认 rollout buffer 参数。
 
-SAVE_EVERY = 100_000  # 每多少个总 transition 保存一次 checkpoint；0 表示不保存中间 checkpoint。
+SAVE_UPDATE_EVERY = 1  # 每多少个 PPO update 保存一次 checkpoint；1 表示每个 update 都保存。
 SAVE_TRAIN_TRAJ = True  # 是否保存 env0 全训练轨迹。
-SAVE_VAL_TRAJ = True  # 是否保存 env0 deterministic val 轨迹。
-VAL_EVERY_ROLLOUTS = 20  # 每多少个 PPO rollout 后跑一次 deterministic val；0 表示关闭。
-VAL_MAX_STEPS = 0  # 每次 val 最多跑多少 step；0 表示使用 env 的 max_episode_length。
-SAVE_BEST = True  # 是否按 val success_rate 保存 best_val.zip。
-BEST_WARMUP_STEPS = 150_000  # 该总 transition 之前不保存 best。
-BEST_MARGIN = 0.02  # success_rate 至少超过历史最好该值才保存 best。
 LOG_INTERVAL = 10  # SB3 log_interval。
 VERBOSE = 1  # SB3 输出详细程度。
 PROGRESS = False  # 是否显示 SB3 progress bar。

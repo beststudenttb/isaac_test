@@ -2,7 +2,7 @@
 
 本项目是视觉强化学习机器人研究项目，从原 Webots + PPO + teacher guidance + imitation learning 路线迁移到 Isaac / IsaacLab，用于测试并行仿真、相机采集和后续视觉策略训练。整体走 train-by-cheat：特权信息 teacher PPO 训练视觉 student。
 
-当前阶段：teacher PPO、自写 student PPO、视觉 student 训练入口、视觉数据采集和 CV 预训练入口已就绪；当前重点转向 MDP-consistent visual representation 预训练。
+当前阶段：teacher PPO、自写 student PPO、视觉 student、MDP student、离线评估入口都已就绪；当前重点是周末批量跑 `old+xd`、`old+shared`、`MDP state` 三组视觉 student，并对比成功率曲线和失败轨迹。
 
 ## 研究方向与总体框架（核心）
 
@@ -49,11 +49,19 @@
 
 当前实现状态：
 
-1. `src/mdp_state.py` 中 `MDPStateNet` 包含 image encoder、GRU belief、posterior/prior z、forward dynamics、IDM、reward/value/done/probe heads。
+1. `src/cv_extractor/mdp_state.py` 中 `MDPStateNet` 包含 image encoder、GRU belief、posterior/prior z、forward dynamics、IDM、reward/value/done/probe heads。
 2. `train/mdp_state.py` 是离线 MDP 表征预训练入口；使用归一化 latent 做 forward dyn loss，记录 `contrast`、`idm`、`retrieval1`、`eff_rank` 和 probe 诊断。
 3. `train/mdp_student.py` 的在线 MDP 微调逻辑已同步到相同 loss 语义，后续接 PPO 时不需要再重新对齐。
-4. 新增 `inverse_head` 后旧 MDP checkpoint 不再完全匹配，新的 MDP 架构需要重新训练 checkpoint。
-5. 当前 contrastive 仍使用 batch 内展平负样本，可能包含同轨迹邻近帧的假负样本；先跑首轮实验，后续必要时改 masked InfoNCE。
+4. `train/mdp_student.py` 当前默认使用冻结的预训练 MDP checkpoint，不在 PPO 内继续训练 MDP；后续如果恢复在线 MDP 微调，相关代码和 cfg 仍保留。
+5. 当前 contrastive 仍使用 batch 内展平负样本，可能包含同轨迹邻近帧的假负样本；先跑对照实验，后续必要时改 masked InfoNCE。
+
+## RL 当前实验状态
+
+- `src/sb3_env.py` 已把 teacher / student 的特权观测改为 `[px, dist, end_d, end_x]`，并在 reset 时由 env 统一采样 stop 目标；reward、stop 区域和 success 判断使用同一份 end state。
+- approach 阶段的状态改善 reward 已改为固定尺度：`px` 改善除以 `IMAGE_WIDTH=224`，`dist` 改善除以 `DIST_MAX - FAIL_NEAR = 6`，`K_X/K_D` 后续手动调。
+- 视觉 student 和 MDP student 的策略输入都显式拼接 `end_obs`，避免随机 stop 目标时策略不知道任务目标。
+- teacher `update_88` 离线评估约 `506/512` 成功，失败样本全部是 timeout，主要原因是初始目标在相机右侧视野外且距离远，search 阶段转头较慢。
+- 周末批量脚本 `scripts/run_weekend_students.sh` 会顺序训练并评估：`old+xd`、`old+shared`、`MDP student`；离线 val 默认 `stride=10`。
 
 当前目录约定：
 

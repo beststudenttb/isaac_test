@@ -13,7 +13,7 @@ from src.env import BallEnv, BallEnvCfg
 @configclass
 class BallPPOEnvCfg(BallEnvCfg):
     action_space = 3
-    observation_space = 2
+    observation_space = 4
     episode_length_s = 10.0
     read_camera = False
 
@@ -43,6 +43,11 @@ class BallPPOEnvCfg(BallEnvCfg):
     r_success = task_cfg.R_SUCCESS
     r_fail = task_cfg.R_FAIL
 
+    end_d_min = task_cfg.STOP_D
+    end_d_max = task_cfg.STOP_D
+    end_x_min = 0.0
+    end_x_max = 0.0
+
 
 class BallPPOEnv(BallEnv):
     cfg: BallPPOEnvCfg
@@ -55,6 +60,8 @@ class BallPPOEnv(BallEnv):
         self.prev_xe = torch.zeros(self.num_envs, device=self.device)
         self.prev_de = torch.zeros(self.num_envs, device=self.device)
         self.prev_a_mag = torch.zeros(self.num_envs, device=self.device)
+        self.end_d = torch.empty(self.num_envs, device=self.device)
+        self.end_x = torch.empty(self.num_envs, device=self.device)
         self.last_success = torch.zeros(self.num_envs, device=self.device, dtype=torch.bool)
         self.last_fail = torch.zeros(self.num_envs, device=self.device, dtype=torch.bool)
         self.last_timeout = torch.zeros(self.num_envs, device=self.device, dtype=torch.bool)
@@ -66,6 +73,8 @@ class BallPPOEnv(BallEnv):
         self.last_move_actions = torch.zeros((self.num_envs, int(self.cfg.action_space)), device=self.device)
         self.last_policy_obs = torch.zeros((self.num_envs, int(self.cfg.observation_space)), device=self.device)
         self.last_rgb = None
+        self.terminal_end_obs = None
+        self.sample_end_state(torch.arange(self.num_envs, device=self.device))
 
     def _reset_idx(self, env_ids):
         if env_ids is None:
@@ -76,6 +85,8 @@ class BallPPOEnv(BallEnv):
             reset_ids = torch.tensor(env_ids, device=self.device, dtype=torch.long)
 
         super()._reset_idx(reset_ids)
+        if hasattr(self, "end_d"):
+            self.sample_end_state(reset_ids)
         if hasattr(self, "stop_steps"):
             self.stop_steps[reset_ids] = 0
             self.prev_seen[reset_ids] = False
@@ -83,6 +94,21 @@ class BallPPOEnv(BallEnv):
             self.prev_xe[reset_ids] = 0.0
             self.prev_de[reset_ids] = 0.0
             self.prev_a_mag[reset_ids] = 0.0
+
+    def sample_end_state(self, env_ids: torch.Tensor) -> None:
+        count = len(env_ids)
+        d_min = float(self.cfg.end_d_min)
+        d_max = float(self.cfg.end_d_max)
+        x_min = float(self.cfg.end_x_min)
+        x_max = float(self.cfg.end_x_max)
+        if d_min == d_max:
+            self.end_d[env_ids] = d_min
+        else:
+            self.end_d[env_ids] = torch.empty(count, device=self.device).uniform_(d_min, d_max)
+        if x_min == x_max:
+            self.end_x[env_ids] = x_min
+        else:
+            self.end_x[env_ids] = torch.empty(count, device=self.device).uniform_(x_min, x_max)
 
     def apply_actions(self, actions: torch.Tensor) -> None:
         actions = torch.clamp(actions, -1.0, 1.0)
@@ -111,7 +137,28 @@ class BallPPOEnv(BallEnv):
         if self.cfg.use_camera and self.cfg.read_camera and self.camera is not None:
             _ = self.camera.data.output["rgb"]
         label = self.project_target()
-        return torch.stack((self.norm_x(label["px_x"], label["dist"]), self.norm_d(label["dist"])), dim=-1)
+        return self.policy_obs(label["px_x"], label["dist"])
+
+    def policy_obs(self, x: torch.Tensor, d: torch.Tensor) -> torch.Tensor:
+        end = self.end_obs()
+        return torch.stack(
+            (
+                self.norm_x(x, d),
+                self.norm_d(d),
+                end[:, 0],
+                end[:, 1],
+            ),
+            dim=-1,
+        )
+
+    def end_obs(self) -> torch.Tensor:
+        if hasattr(self, "end_d"):
+            end_d = self.end_d
+            end_x = self.end_x
+        else:
+            end_d = torch.full((self.num_envs,), float(self.cfg.end_d_min), device=self.device)
+            end_x = torch.full((self.num_envs,), float(self.cfg.end_x_min), device=self.device)
+        return torch.stack((end_d / self.cfg.fail_far, end_x / (self.cfg.image_width * 0.5)), dim=-1)
 
     def norm_x(self, x: torch.Tensor, d: torch.Tensor) -> torch.Tensor:
         seen = d > self.cfg.lost_d
@@ -127,7 +174,7 @@ class BallPPOEnv(BallEnv):
         label = self.project_target()
         x = label["px_x"]
         d = label["dist"]
-        self.last_policy_obs = torch.stack((self.norm_x(x, d), self.norm_d(d)), dim=-1)
+        self.last_policy_obs = self.policy_obs(x, d)
         if self.cfg.use_camera and self.cfg.read_camera and self.camera is not None and torch.any(self.reset_time_outs):
             rgb = self.camera.data.output["rgb"]
             if rgb.shape[-1] > 3:
@@ -143,8 +190,9 @@ class BallPPOEnv(BallEnv):
         seen = d > self.cfg.lost_d
         stop = self.in_stop_zone()
         cx = self.cfg.image_width * 0.5
-        xe = torch.abs(x - cx)
-        de = torch.abs(d - self.cfg.stop_d)
+        end_px = cx + self.end_x
+        xe = torch.abs(x - end_px)
+        de = torch.abs(d - self.end_d)
 
         reward = torch.zeros(self.num_envs, device=self.device)
 
@@ -157,9 +205,11 @@ class BallPPOEnv(BallEnv):
 
         a_mag = torch.max(torch.abs(self.actions), dim=1).values
         app = seen & self.prev_seen & (~stop)
+        x_gain = (self.prev_xe - xe) / self.cfg.image_width
+        d_gain = (self.prev_de - de) / (self.cfg.dist_max - self.cfg.fail_near)
         reward += torch.where(
             app,
-            self.cfg.k_x * (self.prev_xe - xe) + self.cfg.k_d * (self.prev_de - de),
+            self.cfg.k_x * x_gain + self.cfg.k_d * d_gain,
             torch.zeros_like(reward),
         )
 
@@ -174,8 +224,8 @@ class BallPPOEnv(BallEnv):
         )
 
         stop_q = torch.exp(
-            -0.5 * ((x - cx) / self.cfg.sig_x) ** 2
-            -0.5 * ((d - self.cfg.stop_d) / self.cfg.sig_d) ** 2
+            -0.5 * ((x - end_px) / self.cfg.sig_x) ** 2
+            -0.5 * ((d - self.end_d) / self.cfg.sig_d) ** 2
         )
         stop_action = a_mag < self.cfg.stop_eps
         reward += torch.where(
@@ -190,6 +240,12 @@ class BallPPOEnv(BallEnv):
         self.last_success = success
         self.last_fail = fail
         self.last_timeout = timeout & (~success) & (~fail)
+        done = success | fail | timeout
+        if torch.any(done):
+            end_obs = self.end_obs()
+            if self.terminal_end_obs is None or self.terminal_end_obs.shape != end_obs.shape:
+                self.terminal_end_obs = torch.empty_like(end_obs)
+            self.terminal_end_obs[done] = end_obs[done]
         reward += torch.where(success, torch.full_like(reward, self.cfg.r_success), 0.0)
         reward += torch.where(fail & (~success), torch.full_like(reward, self.cfg.r_fail), 0.0)
 
@@ -202,6 +258,14 @@ class BallPPOEnv(BallEnv):
 
     def compute_terminated(self) -> torch.Tensor:
         return (self.stop_steps >= self.cfg.stop_n) | self.out()
+
+    def in_stop_zone(self) -> torch.Tensor:
+        label = self.project_target()
+        cx = self.cfg.image_width * 0.5
+        end_px = cx + self.end_x
+        dist_ok = torch.abs(label["dist"] - self.end_d) <= self.cfg.stop_d_tol
+        px_ok = torch.abs(label["px_x"] - end_px) <= self.cfg.stop_x_tol
+        return dist_ok & px_ok
 
     def out(self) -> torch.Tensor:
         dist = torch.linalg.norm(self.target_xy - self.robot_xy, dim=1)

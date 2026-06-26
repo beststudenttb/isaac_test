@@ -18,6 +18,10 @@ RERENDER_ON_RESET = 1  # reset 后重渲染次数，避免相机图像停留在 
 RENDERING_MODE = "balanced"  # 视觉训练渲染模式，用于临时测速。
 ANTIALIASING_MODE = "DLSS"  # 视觉训练抗锯齿/上采样模式，用于临时测速。
 DLSS_MODE = 0  # DLSS 模式：0 performance，1 balanced，2 quality，3 auto。
+END_D_MIN = 1.5  # state/reward 里的停止距离最小值，单位 m。
+END_D_MAX = 1.5  # state/reward 里的停止距离最大值，单位 m。
+END_X_MIN = 0.0  # state/reward 里的图像停止位置最小值，单位 px，0 表示图像中心。
+END_X_MAX = 0.0  # state/reward 里的图像停止位置最大值，单位 px。
 
 VISION_CHOICE = "old_reserve"  # 从文件末尾 VISION_CHOICES 里选择一个视觉 state。
 FREEZE_VISION = True  # 第一版先冻结视觉 encoder，只训练 PPO。

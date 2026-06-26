@@ -1,0 +1,13 @@
+checkpoint = update_000421.pt
+mdp_checkpoint = last.pt
+update = 421
+mdp_update = 0
+step = 1724416
+num_envs = 64
+num_episodes = 1
+episodes = 64
+success_rate = 0.515625
+fail_rate = 0.0
+timeout_rate = 0.484375
+mean_return = 11.797098159790039
+mean_len = 278.265625

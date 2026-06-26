@@ -1,8 +1,8 @@
-"""Offline validate privileged student update checkpoints.
+"""Offline validate teacher update checkpoints.
 
 Run from the project root:
 
-    ./IsaacLab/isaaclab.sh -p val/student.py
+    ./IsaacLab/isaaclab.sh -p val/teacher.py
 """
 
 from __future__ import annotations
@@ -16,10 +16,10 @@ from pathlib import Path
 
 from isaaclab.app import AppLauncher
 
-import student_cfg as cfg
+import teacher_cfg as cfg
 
 
-parser = argparse.ArgumentParser(description="Offline validate privileged student update checkpoints.")
+parser = argparse.ArgumentParser(description="Offline validate teacher update checkpoints.")
 parser.add_argument("--num-envs", type=int, default=None)
 parser.add_argument("--num-episodes", type=int, default=int(cfg.NUM_EPISODES))
 parser.add_argument("--start", type=int, default=int(cfg.START))
@@ -38,20 +38,14 @@ simulation_app = app_launcher.app
 
 import numpy as np
 import torch
-import torch.nn as nn
+from stable_baselines3 import PPO
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.ppo import ActorCritic
-from src.sb3_env import BallPPOEnv, BallPPOEnvCfg
+from src.sb3_env import BallPPOEnvCfg, make_sb3_env
+from src.val_callback import TRAJ_FIELDS, make_traj_row
 
-
-ACTIVATIONS = {
-    "tanh": nn.Tanh,
-    "relu": nn.ReLU,
-    "elu": nn.ELU,
-}
 
 VAL_FIELDS = [
     "checkpoint",
@@ -67,35 +61,12 @@ VAL_FIELDS = [
     "mean_len",
 ]
 
-TRAJ_FIELDS = [
-    "phase",
-    "step",
-    "update",
-    "t",
-    "env_id",
-    "px_x",
-    "dist",
-    "a_x",
-    "a_y",
-    "a_w",
-    "reward",
-    "done",
-    "success",
-    "fail",
-    "timeout",
-    "robot_x",
-    "robot_y",
-    "head_yaw",
-    "target_x",
-    "target_y",
-]
-
 
 def run_dir() -> Path:
     return Path(cfg.OUT_DIR)
 
 
-def make_env() -> BallPPOEnv:
+def make_env():
     env_cfg = BallPPOEnvCfg()
     env_cfg.seed = int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
@@ -108,59 +79,13 @@ def make_env() -> BallPPOEnv:
     env_cfg.end_d_max = float(cfg.END_D_MAX)
     env_cfg.end_x_min = float(cfg.END_X_MIN)
     env_cfg.end_x_max = float(cfg.END_X_MAX)
-    return BallPPOEnv(env_cfg)
+    return make_sb3_env(env_cfg, fast_variant=True)
 
 
-def load_model(path: Path, device: torch.device, obs_dim: int) -> tuple[ActorCritic, dict]:
-    ckpt = torch.load(path, map_location=device)
-    model = ActorCritic(
-        obs_dim=int(obs_dim),
-        act_dim=3,
-        pi_hidden=list(cfg.POLICY_NET),
-        vf_hidden=list(cfg.VALUE_NET),
-        activation=ACTIVATIONS[str(cfg.ACTIVATION)],
-        init_std=float(cfg.STD_INIT),
-    ).to(device)
-    model.load_state_dict(ckpt["model"])
-    model.eval()
-    return model, ckpt
-
-
-def traj_row(
-    env: BallPPOEnv,
-    phase: str,
-    step: int,
-    update: int,
-    t: int,
-    env_id: int,
-    reward: torch.Tensor,
-    done: bool,
-) -> dict:
-    action = env.last_move_actions[env_id].detach().cpu().numpy()
-    robot_xy = env.last_robot_xy[env_id].detach().cpu().numpy()
-    target_xy = env.last_target_xy[env_id].detach().cpu().numpy()
-    return {
-        "phase": phase,
-        "step": int(step),
-        "update": int(update),
-        "t": int(t),
-        "env_id": int(env_id),
-        "px_x": f"{float(env.last_px_x[env_id].item()):.4f}",
-        "dist": f"{float(env.last_dist[env_id].item()):.4f}",
-        "a_x": f"{float(action[0]):.4f}",
-        "a_y": f"{float(action[1]):.4f}",
-        "a_w": f"{float(action[2]):.4f}",
-        "reward": f"{float(reward.item()):.4f}",
-        "done": int(done),
-        "success": int(bool(env.last_success[env_id].item())),
-        "fail": int(bool(env.last_fail[env_id].item())),
-        "timeout": int(bool(env.last_timeout[env_id].item())),
-        "robot_x": f"{float(robot_xy[0]):.4f}",
-        "robot_y": f"{float(robot_xy[1]):.4f}",
-        "head_yaw": f"{float(env.last_head_yaw[env_id].item()):.4f}",
-        "target_x": f"{float(target_xy[0]):.4f}",
-        "target_y": f"{float(target_xy[1]):.4f}",
-    }
+def load_model(path: Path) -> tuple[PPO, int]:
+    model = PPO.load(path, device=args_cli.device)
+    update = int(path.stem.split("_")[-1])
+    return model, update
 
 
 def fmt_value(value) -> str:
@@ -186,15 +111,16 @@ def print_log(groups: list[tuple[str, list[tuple[str, object]]]]):
 
 
 def val(
-    env: BallPPOEnv,
-    model: ActorCritic,
+    env,
+    model: PPO,
     num_episodes: int,
-    update: int = -1,
-    step: int = -1,
+    update: int,
+    step: int,
     traj_writer: csv.DictWriter | None = None,
     env0_traj_writer: csv.DictWriter | None = None,
 ) -> dict:
-    steps = int(cfg.VAL_STEPS) if int(cfg.VAL_STEPS) > 0 else int(env.max_episode_length)
+    base_env = env.unwrapped
+    steps = int(cfg.VAL_STEPS) if int(cfg.VAL_STEPS) > 0 else int(base_env.max_episode_length)
     episodes = env.num_envs * int(num_episodes)
     success_count = 0
     fail_count = 0
@@ -202,68 +128,68 @@ def val(
     return_sum = 0.0
     len_sum = 0.0
 
-    model.eval()
-    with torch.no_grad():
-        for episode_id in range(int(num_episodes)):
-            obs, _ = env.reset()
-            obs_t = obs["policy"]
-            done_once = torch.zeros(env.num_envs, device=env.device, dtype=torch.bool)
-            returns = torch.zeros(env.num_envs, device=env.device)
-            lengths = torch.zeros(env.num_envs, device=env.device)
-            success = torch.zeros(env.num_envs, device=env.device, dtype=torch.bool)
-            fail = torch.zeros(env.num_envs, device=env.device, dtype=torch.bool)
-            timeout = torch.zeros(env.num_envs, device=env.device, dtype=torch.bool)
+    for episode_id in range(int(num_episodes)):
+        obs = env.reset()
+        done_once = np.zeros(env.num_envs, dtype=bool)
+        returns = np.zeros(env.num_envs, dtype=np.float64)
+        lengths = np.zeros(env.num_envs, dtype=np.int64)
+        success = np.zeros(env.num_envs, dtype=bool)
+        fail = np.zeros(env.num_envs, dtype=bool)
+        timeout = np.zeros(env.num_envs, dtype=bool)
 
-            for t in range(steps):
-                action = model.predict(obs_t)
-                obs, reward, terminated, truncated, _info = env.step(action)
-                active = ~done_once
-                returns[active] += reward[active]
-                lengths[active] += 1
-                done = (terminated | truncated) & active
-                if traj_writer is not None:
-                    for env_id in torch.nonzero(active, as_tuple=False).flatten().tolist():
-                        traj_writer.writerow(
-                            traj_row(
-                                env,
-                                "offline_val",
-                                step,
-                                update,
-                                episode_id * steps + t,
-                                int(env_id),
-                                reward[int(env_id)],
-                                bool(done[int(env_id)]),
-                            )
-                        )
-                if env0_traj_writer is not None and bool(active[0].item()):
-                    env0_traj_writer.writerow(
-                        traj_row(
-                            env,
-                            "offline_val_env0",
-                            step,
-                            update,
-                            episode_id * steps + t,
-                            0,
-                            reward[0],
-                            bool(done[0]),
+        for t in range(steps):
+            actions, _ = model.predict(obs, deterministic=True)
+            obs, rewards, dones, _infos = env.step(actions)
+            active = ~done_once
+            returns[active] += rewards[active]
+            lengths[active] += 1
+            done = dones & active
+            if traj_writer is not None:
+                for env_id in np.flatnonzero(active):
+                    traj_writer.writerow(
+                        make_traj_row(
+                            base_env,
+                            phase="offline_val",
+                            step=step,
+                            rollout=update,
+                            t=episode_id * steps + t,
+                            env_id=int(env_id),
+                            reward=rewards[int(env_id)],
+                            done=bool(done[int(env_id)]),
                         )
                     )
-                if torch.any(done):
-                    success[done] = env.last_success[done]
-                    fail[done] = env.last_fail[done]
-                    timeout[done] = env.last_timeout[done] | truncated[done]
-                    done_once[done] = True
-                    if bool(done_once.all()):
-                        break
-                obs_t = obs["policy"]
+            if env0_traj_writer is not None and bool(active[0]):
+                env0_traj_writer.writerow(
+                    make_traj_row(
+                        base_env,
+                        phase="offline_val",
+                        step=step,
+                        rollout=update,
+                        t=episode_id * steps + t,
+                        env_id=0,
+                        reward=rewards[0],
+                        done=bool(done[0]),
+                    )
+                )
+            done_ids = np.flatnonzero(done)
+            if len(done_ids) > 0:
+                success_buf = base_env.last_success.detach().cpu().numpy()
+                fail_buf = base_env.last_fail.detach().cpu().numpy()
+                timeout_buf = base_env.last_timeout.detach().cpu().numpy()
+                success[done_ids] = success_buf[done_ids]
+                fail[done_ids] = fail_buf[done_ids]
+                timeout[done_ids] = timeout_buf[done_ids]
+                done_once[done_ids] = True
+                if done_once.all():
+                    break
 
-            timeout[~done_once] = True
-            lengths[~done_once] = steps
-            success_count += int(success.sum().item())
-            fail_count += int(fail.sum().item())
-            timeout_count += int(timeout.sum().item())
-            return_sum += float(returns.sum().cpu())
-            len_sum += float(lengths.sum().cpu())
+        timeout[~done_once] = True
+        lengths[~done_once] = steps
+        success_count += int(success.sum())
+        fail_count += int(fail.sum())
+        timeout_count += int(timeout.sum())
+        return_sum += float(returns.sum())
+        len_sum += float(lengths.sum())
 
     return {
         "success_rate": success_count / episodes,
@@ -283,9 +209,10 @@ def best_key(row: dict) -> tuple:
     )
 
 
-def write_config(path: Path, env: BallPPOEnv):
+def write_config(path: Path, env):
+    base_env = env.unwrapped
     lines = [
-        f"run_name = 'student_ppo'",
+        "run_name = 'teacher_ppo'",
         f"num_envs = {env.num_envs!r}",
         f"num_episodes = {int(args_cli.num_episodes)!r}",
         f"start = {int(args_cli.start)!r}",
@@ -295,9 +222,13 @@ def write_config(path: Path, env: BallPPOEnv):
         f"episode_s = {float(cfg.EPISODE_S)!r}",
         f"stop_n = {int(cfg.STOP_N)!r}",
         f"seed = {int(cfg.SEED)!r}",
-        f"device = {env.device!r}",
+        f"device = {base_env.device!r}",
         f"use_camera = {bool(cfg.USE_CAMERA)!r}",
         f"read_camera = {bool(cfg.READ_CAMERA)!r}",
+        f"end_d_min = {float(cfg.END_D_MIN)!r}",
+        f"end_d_max = {float(cfg.END_D_MAX)!r}",
+        f"end_x_min = {float(cfg.END_X_MIN)!r}",
+        f"end_x_max = {float(cfg.END_X_MAX)!r}",
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -312,7 +243,7 @@ def main():
     update_dir = root / "updates"
     if not update_dir.exists():
         raise FileNotFoundError(f"update dir not found: {update_dir}")
-    update_paths = sorted(update_dir.glob("update_*.pt"))
+    update_paths = sorted(update_dir.glob("update_*.zip"))
     if not update_paths:
         raise FileNotFoundError(f"no update checkpoints found: {update_dir}")
     start = int(args_cli.start)
@@ -328,7 +259,6 @@ def main():
         raise FileNotFoundError(f"no update checkpoints found after start={start}, stride={stride}: {update_dir}")
 
     env = make_env()
-    device = torch.device(env.device)
     write_config(root / "offline_val_config.py", env)
     out_csv = root / "offline_val.csv"
     env0_traj_csv = root / "traj_offline_env0.csv"
@@ -336,9 +266,9 @@ def main():
     best_path = None
 
     print(
-        f"[INFO] offline val run=student_ppo updates={len(update_paths)} "
+        f"[INFO] offline val run=teacher_ppo updates={len(update_paths)} "
         f"envs={env.num_envs} num_episodes={args_cli.num_episodes} start={args_cli.start} "
-        f"stride={args_cli.stride} device={env.device}"
+        f"stride={args_cli.stride} device={env.unwrapped.device}"
     )
     try:
         mode = "a" if int(args_cli.start) > 0 else "w"
@@ -349,17 +279,9 @@ def main():
                 writer.writeheader()
                 env0_writer.writeheader()
             for path in update_paths:
-                model, ckpt = load_model(path, device, int(env.cfg.observation_space))
-                update = int(ckpt.get("update", -1))
-                step = int(ckpt.get("step", -1))
-                info = val(
-                    env,
-                    model,
-                    int(args_cli.num_episodes),
-                    update,
-                    step,
-                    env0_traj_writer=env0_writer,
-                )
+                model, update = load_model(path)
+                step = int(model.num_timesteps)
+                info = val(env, model, int(args_cli.num_episodes), update, step, env0_traj_writer=env0_writer)
                 row = {
                     "checkpoint": path.name,
                     "update": update,
@@ -377,14 +299,7 @@ def main():
                     best_path = path
                 print_log(
                     [
-                        (
-                            "model",
-                            [
-                                ("checkpoint", row["checkpoint"]),
-                                ("update", row["update"]),
-                                ("step", row["step"]),
-                            ],
-                        ),
+                        ("model", [("checkpoint", row["checkpoint"]), ("update", row["update"]), ("step", row["step"])]),
                         (
                             "val",
                             [
@@ -401,12 +316,13 @@ def main():
 
         if best_row is None or best_path is None:
             raise RuntimeError("offline val did not produce best checkpoint")
-        shutil.copy2(best_path, root / "best_offline.pt")
+        shutil.copy2(best_path, root / "best_offline.zip")
+        shutil.copy2(best_path, root / "best_val.zip")
         (root / "best_offline_info.txt").write_text(
             "\n".join(f"{key} = {value}" for key, value in best_row.items()) + "\n",
             encoding="utf-8",
         )
-        best_model, _best_ckpt = load_model(best_path, device, int(env.cfg.observation_space))
+        best_model, _best_update = load_model(best_path)
         with (root / "traj_best_offline.csv").open("w", newline="", encoding="utf-8") as traj_file:
             traj_writer = csv.DictWriter(traj_file, fieldnames=TRAJ_FIELDS)
             traj_writer.writeheader()

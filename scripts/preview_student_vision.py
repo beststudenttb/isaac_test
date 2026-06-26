@@ -154,6 +154,10 @@ def make_env() -> BallPPOEnv:
     env_cfg.use_camera = True
     env_cfg.read_camera = True
     env_cfg.num_rerenders_on_reset = int(cfg.RERENDER_ON_RESET)
+    env_cfg.end_d_min = float(cfg.END_D_MIN)
+    env_cfg.end_d_max = float(cfg.END_D_MAX)
+    env_cfg.end_x_min = float(cfg.END_X_MIN)
+    env_cfg.end_x_max = float(cfg.END_X_MAX)
     return BallPPOEnv(env_cfg)
 
 
@@ -195,17 +199,21 @@ def encode_image(image: torch.Tensor, encoder: nn.Module) -> torch.Tensor:
     return select_state(out).float().detach()
 
 
+def policy_obs(feature: torch.Tensor, end_obs: torch.Tensor) -> torch.Tensor:
+    return torch.cat((feature, end_obs), dim=-1)
+
+
 def vision_obs(env: BallPPOEnv, encoder: nn.Module) -> torch.Tensor:
     if env.camera is None:
         raise RuntimeError("vision preview requires env camera")
-    return encode_image(env.camera.data.output["rgb"], encoder)
+    return policy_obs(encode_image(env.camera.data.output["rgb"], encoder), env.end_obs())
 
 
 def load_model(path: Path, device: torch.device) -> ActorCritic:
     ckpt = torch.load(path, map_location=device)
     choice = vision_choice()
     model = ActorCritic(
-        obs_dim=int(choice["dim"]),
+        obs_dim=int(choice["dim"]) + 2,
         act_dim=3,
         pi_hidden=list(cfg.POLICY_NET),
         vf_hidden=list(cfg.VALUE_NET),

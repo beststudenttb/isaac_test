@@ -164,7 +164,7 @@ class MDPStateNet(nn.Module):
                 "value": self.value_head(state_feature),
             }
         )
-        probe_raw = self.probe_head(state_feature.detach())
+        probe_raw = self.probe_head(state_feature)
         enc["probe"] = torch.cat(
             [
                 torch.tanh(probe_raw[:, 0:1]),
