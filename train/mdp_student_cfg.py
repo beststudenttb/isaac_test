@@ -43,7 +43,7 @@ MDP_DONE_W = 0.2  # MDP done 预测 loss 权重。
 MDP_VALUE_W = 0.1  # MDP value 预测 loss 权重。
 
 TEACHER_PATH = "./models/rl/teacher_ppo/best_val.zip"  # teacher SB3 PPO 模型路径。
-TEACHER_LOSS = 1  # teacher imitation loss 权重；0 表示关闭。
+TEACHER_LOSS = 1.0  # teacher imitation loss 权重；0 表示关闭。
 TEACHER_LOSS_MIN = 0.01  # teacher imitation loss 权重下限。
 TEACHER_DOWN_MDP = 0.3  # 每次 MDP 更新后固定降低的 teacher imitation loss 权重。
 TEACHER_DOWN_SUCCESS = 0.00  # 每次 val 后，按 success_rate 乘该值降低 teacher 权重。

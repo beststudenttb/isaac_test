@@ -29,9 +29,9 @@ ENCODER_FP16 = True  # 冻结 encoder 前向使用 fp16 autocast。
 
 TEACHER_PATH = "./models/rl/teacher_ppo/best_val.zip"  # teacher SB3 PPO 模型路径。
 TRAIN_MODE = "student"  # student 使用 teacher loss；teacher 关闭 teacher loss。
-TEACHER_LOSS = 0.0  # teacher imitation loss 权重；0 表示关闭。
+TEACHER_LOSS = 1.0  # teacher imitation loss 权重；0 表示关闭。
 TEACHER_LOSS_MIN = 0.01  # teacher imitation loss 权重下限。
-TEACHER_DOWN_SUCCESS = 0.00  # 每次 val 后，按 success_rate 乘该值降低 teacher 权重。
+TEACHER_DOWN_SUCCESS = 0.3  # 每次 val 后，按 success_rate 乘该值降低 teacher 权重。
 TEACHER_UP_OUT = 0.00  # 每次 val 后，按 out/fail_rate 乘该值提高 teacher 权重。
 TEACHER_UP_TIMEOUT = 0.0  # 每次 val 后，按 timeout_rate 乘该值调整 teacher 权重；当前占位为 0。
 
