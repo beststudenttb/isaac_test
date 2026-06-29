@@ -11,6 +11,9 @@
 - `config.py`: 本次训练配置快照。
 - `log.csv`: 训练日志，记录到 update 62。
 - `val.csv`: deterministic val 日志，`VAL_EVERY = 5`。
+- `deps/teacher_ppo/policy.zip`: 对应时期的 2 维特权 teacher，来自 `approved_models/2026_06_16_teacher_ppo/policy.zip`。
+
+注意：原配置写的是 `models/teacher_ppo/best_val.zip`，该精确文件当前现场未找到；本目录保存的是已归档的同代 teacher checkpoint。
 
 未复制大轨迹文件：
 

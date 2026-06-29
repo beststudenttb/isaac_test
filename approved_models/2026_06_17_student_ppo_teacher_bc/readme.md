@@ -9,6 +9,9 @@
 - `config.py`: 本次训练参数。
 - `log.csv`: 每个 update 的训练过程指标。
 - `val.csv`: 每次 deterministic val 的评估指标。
+- `deps/teacher_ppo/policy.zip`: 对应时期的 2 维特权 teacher，来自 `approved_models/2026_06_16_teacher_ppo/policy.zip`。
+
+注意：原配置写的是 `models/teacher_ppo/best_val.zip`，该精确文件当前现场未找到；本目录保存的是已归档的同代 teacher checkpoint。
 
 训练现场的大轨迹文件未复制进本目录，仍在：
 

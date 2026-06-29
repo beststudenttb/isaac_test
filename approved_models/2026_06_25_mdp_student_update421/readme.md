@@ -4,6 +4,7 @@
 
 - `policy_update_000421.pt`：PPO student policy，来自 `models/rl/mdp_student/updates/update_000421.pt`。
 - `mdp_state_initial.pt`：对应的 MDP state 模型，来自 `models/vision/mdp_state_priv_IDM_vicreg/last.pt`。该 policy 早于第一次在线 MDP update，所以使用初始 MDP。
+- `deps/teacher_ppo/best_val.zip`：训练时使用的 teacher。
 - `config.py`：训练配置快照。
 - `train_log.csv`：训练日志。
 - `offline_val.csv`：离线评估日志。

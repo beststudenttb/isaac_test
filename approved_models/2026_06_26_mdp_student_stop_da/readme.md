@@ -6,6 +6,7 @@ Saved files:
 - `best_offline.pt`: best model selected by offline validation.
 - `last.pt`: final model from the training run.
 - `mdp_state.pt`: pretrained MDP state model used by the student policy.
+- `deps/teacher_ppo/best_val.zip`: teacher model used by teacher loss.
 - `traj_train_env0.csv`: env0 full training trajectory.
 - `traj_best_offline.csv`: full trajectory for the best offline validation model.
 - `traj_offline_env0.csv`: env0 offline validation trajectory.

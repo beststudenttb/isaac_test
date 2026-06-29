@@ -36,3 +36,8 @@
 - `best_offline_info.txt`：best checkpoint 摘要。
 
 `updates/` 未保存，因为三个目录的逐 update checkpoint 合计接近 1.5G，不适合作为 approved 结果上传。
+
+## 依赖模型
+
+- `deps/cv_old/best.pt`: 三组视觉 student 共同使用的 `old` 视觉预训练模型。
+- `deps/cv_old/log.csv`: 对应视觉预训练日志。
