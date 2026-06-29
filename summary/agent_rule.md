@@ -34,6 +34,7 @@
 - `assets/` 放固定资源，例如机器人 USD、场景 USD、材质和模型文件；agent 不得擅自修改。确需修改时，先说明具体文件、影响和风险，并获得用户允许。
 - `models/` 放本地训练现场输出，不上传 Git。
 - `approved_models/` 放确认保留的模型、配置、trajectory 和说明，需要上传 Git。
+- 每次保存实验到 `approved_models/` 时，目录必须尽量自包含：除当前 policy 外，还要放入复现/继续训练所需的视觉预训练、MDP state、teacher 等依赖 checkpoint，并在 `readme.md` 写清楚恢复到默认相对路径的命令。除非用户明确要求拆开保存，否则不得只保存 RL 部分。
 - `summary/` 放项目状态、任务流程、TODO、每日总结和共享规则。
 - `summary/task_flow.md` 只记录任务流程语义，不放 reward、参数或实现细节。
 - 每日总结命名为 `yyyy_mm_dd_{device}.md`；用户要求总结并上传 Git 时，先更新当日总结、`summary/readme.md` 和 `summary/TODO.md`，再按用户确认范围 push。
