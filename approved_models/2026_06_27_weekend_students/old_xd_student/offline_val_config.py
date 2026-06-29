@@ -1,0 +1,16 @@
+run_name = 'old_xd_student'
+cv_model = 'old'
+state = 'xd'
+mode = 'student'
+num_envs = 32
+num_episodes = 1
+start = 0
+stride = 10
+episodes_per_checkpoint = 32
+val_steps = 0
+episode_s = 15.0
+seed = 1
+device = 'cuda:0'
+vision_model = 'old'
+vision_state = 'pred'
+vision_ckpt = 'models/vision/cv_old/best.pt'
