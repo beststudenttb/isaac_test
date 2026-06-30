@@ -38,18 +38,19 @@ STOP_X_TOL = 10.0  # stop 区域图像中心容差，单位 px。
 
 STOP_EPS = 0.05  # 三个动作绝对值都小于该值时视为 stop。
 
-FAIL_NEAR = 1.0  # 机器人到球平面距离小于该值时 fail。
+FAIL_NEAR = 0.5  # 机器人到球平面距离小于该值时 fail。
 FAIL_FAR = 8.0  # 机器人到球平面距离大于该值时 fail。
 
 XY_SPEED = 1.0  # 机器人 x/y 平移最大速度，单位 m/s。
 HEAD_SPEED = np.pi / 2  # 头部最大角速度，单位 rad/s，默认 pi/2。
 
 K_SEARCH = 0.05  # search 阶段 x/y 平移动作惩罚系数。
-K_TIME = 0.01  # 看到球之后的每步时间惩罚系数，search 阶段不使用。
+K_SEARCH_W = 0.01  # search 阶段转头动作奖励系数。
+K_TIME = 0.003  # 看到球之后的每步时间惩罚系数，search 阶段不使用。
 K_X = 1.0  # approach 阶段 px_x 误差改善 reward 系数。
 K_D = 1.0  # approach 阶段 dist 误差改善 reward 系数。
 K_STOP_A = 0.5  # 保留参数；当前 stop 区域不再使用动作平方惩罚。
-K_STOP_DA = 1.0  # stop 区域内动作幅度变小的改善 reward 系数。
+K_STOP_DA = 0.0  # stop 区域内动作幅度变小的改善 reward 系数。
 
 SIG_X = 5.0  # stop 区域二维高斯的图像 x 标准差，单位 px。
 SIG_D = 0.1  # stop 区域二维高斯的距离标准差，单位 m。
@@ -59,6 +60,6 @@ R_LOST = -2.0  # 从看到球到看不到球时的一次性 penalty。
 R_STOP_IN = 1.0  # 第一次进入 stop 区域时的一次性 reward。
 R_STOP_OUT = -2.0  # 从 stop 区域离开时的一次性 penalty。
 R_STOP_Q = 0.3  # 保留参数。
-R_STOP = 3.0  # stop 区域内输出 stop 信号时按二维高斯强度给的奖励。
+R_STOP = 0.0  # stop 区域内输出 stop 信号时按二维高斯强度给的奖励。
 R_SUCCESS = 10.0  # success done 时的固定终止 reward。
 R_FAIL = -10.0  # fail done 或 timeout 时的终止 penalty。

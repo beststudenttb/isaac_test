@@ -4,12 +4,13 @@ from pathlib import Path
 
 
 OUT_DIR = Path("./models/rl/student_vision")  # 视觉 student PPO 输出目录。
+RANDOM_STOP_OUT_DIR = Path("./models/rl/student_vision_random_stop")  # --random-stop 时的输出目录。
 CLEAR_OUT_DIR = True  # 每次训练前清空 OUT_DIR。
 
 NUM_ENVS = 128  # 并行环境数量；视觉训练先用较小数量测试显存和速度。
 TOTAL_STEPS = 8_192_000  # 总采样步数，按 SB3 total_timesteps 语义。
 EPISODE_S = 15.0  # 单个 episode 最长仿真时间，单位秒。
-STOP_N = 3  # 视觉 student 成功需要连续 stop 的 step 数；先用 1 增加 stop 信号。
+STOP_N = 1  # 训练时只要在 stop 区输出一次 stop 就 success done。
 SEED = 1  # 随机种子。
 DEVICE = None  # None 表示使用 IsaacLab 命令行 device。
 USE_CAMERA = True  # 视觉 student 必须开启相机。
@@ -22,12 +23,17 @@ END_D_MIN = 1.5  # state/reward 里的停止距离最小值，单位 m。
 END_D_MAX = 1.5  # state/reward 里的停止距离最大值，单位 m。
 END_X_MIN = 0.0  # state/reward 里的图像停止位置最小值，单位 px，0 表示图像中心。
 END_X_MAX = 0.0  # state/reward 里的图像停止位置最大值，单位 px。
+RANDOM_END_D_MIN = 1.3  # --random-stop 时的停止距离最小值，单位 m。
+RANDOM_END_D_MAX = 1.8  # --random-stop 时的停止距离最大值，单位 m。
+RANDOM_END_X_MIN = -20.0  # --random-stop 时的图像停止位置最小值，单位 px。
+RANDOM_END_X_MAX = 20.0  # --random-stop 时的图像停止位置最大值，单位 px。
 
 VISION_CHOICE = "old_reserve"  # 从文件末尾 VISION_CHOICES 里选择一个视觉 state。
 FREEZE_VISION = True  # 第一版先冻结视觉 encoder，只训练 PPO。
 ENCODER_FP16 = True  # 冻结 encoder 前向使用 fp16 autocast。
 
 TEACHER_PATH = "./models/rl/teacher_ppo/best_val.zip"  # teacher SB3 PPO 模型路径。
+RANDOM_TEACHER_PATH = "./models/rl/teacher_ppo_random_stop/best_val.zip"  # --random-stop 时的 teacher 路径。
 TRAIN_MODE = "student"  # student 使用 teacher loss；teacher 关闭 teacher loss。
 TEACHER_LOSS = 1.0  # teacher imitation loss 权重；0 表示关闭。
 TEACHER_LOSS_MIN = 0.01  # teacher imitation loss 权重下限。

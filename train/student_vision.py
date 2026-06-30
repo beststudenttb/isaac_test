@@ -40,6 +40,7 @@ parser.add_argument("--state", choices=["xd", "shared", "feature"], default=None
 parser.add_argument("--cv-model", choices=["old", "old-m", "resnet", "mobile"], default=None)
 parser.add_argument("--num-envs", type=int, default=None)
 parser.add_argument("--resume", type=int, default=None)
+parser.add_argument("--random-stop", action="store_true")
 mode_group = parser.add_mutually_exclusive_group()
 mode_group.add_argument("--student", action="store_true")
 mode_group.add_argument("--teacher", action="store_true")
@@ -138,6 +139,8 @@ TRAJ_FIELDS = [
     "env_id",
     "px_x",
     "dist",
+    "end_d",
+    "end_x",
     "a_x",
     "a_y",
     "a_w",
@@ -190,11 +193,34 @@ VAL_FIELDS = [
 
 
 def out_dir() -> Path:
-    path = Path(cfg.OUT_DIR) / run_name()
+    root = Path(cfg.RANDOM_STOP_OUT_DIR) if args_cli.random_stop else Path(cfg.OUT_DIR)
+    path = root / run_name()
     if args_cli.resume is None and bool(cfg.CLEAR_OUT_DIR) and path.exists():
         shutil.rmtree(path)
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def end_range() -> tuple[float, float, float, float]:
+    if args_cli.random_stop:
+        return (
+            float(cfg.RANDOM_END_D_MIN),
+            float(cfg.RANDOM_END_D_MAX),
+            float(cfg.RANDOM_END_X_MIN),
+            float(cfg.RANDOM_END_X_MAX),
+        )
+    return (
+        float(cfg.END_D_MIN),
+        float(cfg.END_D_MAX),
+        float(cfg.END_X_MIN),
+        float(cfg.END_X_MAX),
+    )
+
+
+def teacher_path() -> str:
+    if args_cli.random_stop:
+        return str(cfg.RANDOM_TEACHER_PATH)
+    return str(cfg.TEACHER_PATH)
 
 
 def write_config(path: Path):
@@ -207,6 +233,8 @@ def write_config(path: Path):
     lines.append(f"CLI_CV_MODEL = {args_cli.cv_model!r}")
     lines.append(f"CLI_MODE = {train_mode()!r}")
     lines.append(f"VISION_CHOICE_USED = {vision_choice_name()!r}")
+    lines.append(f"RANDOM_STOP = {bool(args_cli.random_stop)!r}")
+    lines.append(f"TEACHER_PATH_USED = {teacher_path()!r}")
     lines.append(f"RESUME = {str(args_cli.resume)!r}")
     (path / "config.py").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -257,6 +285,7 @@ def open_csv(path: Path, fields: list[str], append: bool):
 
 
 def make_env() -> BallPPOEnv:
+    end_d_min, end_d_max, end_x_min, end_x_max = end_range()
     env_cfg = BallPPOEnvCfg()
     env_cfg.seed = int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
@@ -272,10 +301,10 @@ def make_env() -> BallPPOEnv:
     env_cfg.use_camera = True
     env_cfg.read_camera = True
     env_cfg.num_rerenders_on_reset = int(cfg.RERENDER_ON_RESET)
-    env_cfg.end_d_min = float(cfg.END_D_MIN)
-    env_cfg.end_d_max = float(cfg.END_D_MAX)
-    env_cfg.end_x_min = float(cfg.END_X_MIN)
-    env_cfg.end_x_max = float(cfg.END_X_MAX)
+    env_cfg.end_d_min = end_d_min
+    env_cfg.end_d_max = end_d_max
+    env_cfg.end_x_min = end_x_min
+    env_cfg.end_x_max = end_x_max
     return BallPPOEnv(env_cfg)
 
 
@@ -385,7 +414,7 @@ def load_teacher(device: torch.device):
         and float(cfg.TEACHER_UP_TIMEOUT) <= 0.0
     ):
         return None
-    path = Path(cfg.TEACHER_PATH)
+    path = Path(teacher_path())
     if not path.exists():
         raise FileNotFoundError(f"teacher model not found: {path}")
     return PPO.load(str(path), device=device)
@@ -415,6 +444,8 @@ def traj_row(
     action = env.last_move_actions[env_id].detach().cpu().numpy()
     robot_xy = env.last_robot_xy[env_id].detach().cpu().numpy()
     target_xy = env.last_target_xy[env_id].detach().cpu().numpy()
+    end_d = env.end_d[env_id].detach().cpu().item()
+    end_x = env.end_x[env_id].detach().cpu().item()
     return {
         "phase": phase,
         "step": int(step),
@@ -423,6 +454,8 @@ def traj_row(
         "env_id": int(env_id),
         "px_x": f"{float(env.last_px_x[env_id].item()):.4f}",
         "dist": f"{float(env.last_dist[env_id].item()):.4f}",
+        "end_d": f"{float(end_d):.4f}",
+        "end_x": f"{float(end_x):.4f}",
         "a_x": f"{float(action[0]):.4f}",
         "a_y": f"{float(action[1]):.4f}",
         "a_w": f"{float(action[2]):.4f}",

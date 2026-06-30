@@ -17,6 +17,8 @@ TRAJ_FIELDS = [
     "env_id",
     "px_x",
     "dist",
+    "end_d",
+    "end_x",
     "a_x",
     "a_y",
     "a_w",
@@ -37,6 +39,8 @@ def make_traj_row(base_env, phase: str, step: int, rollout: int, t: int, env_id:
     action = base_env.last_move_actions[env_id].detach().cpu().numpy()
     robot_xy = base_env.last_robot_xy[env_id].detach().cpu().numpy()
     target_xy = base_env.last_target_xy[env_id].detach().cpu().numpy()
+    end_d = base_env.end_d[env_id].detach().cpu().item()
+    end_x = base_env.end_x[env_id].detach().cpu().item()
     return {
         "phase": phase,
         "step": int(step),
@@ -45,6 +49,8 @@ def make_traj_row(base_env, phase: str, step: int, rollout: int, t: int, env_id:
         "env_id": env_id,
         "px_x": f"{float(base_env.last_px_x[env_id].item()):.4f}",
         "dist": f"{float(base_env.last_dist[env_id].item()):.4f}",
+        "end_d": f"{float(end_d):.4f}",
+        "end_x": f"{float(end_x):.4f}",
         "a_x": f"{float(action[0]):.4f}",
         "a_y": f"{float(action[1]):.4f}",
         "a_w": f"{float(action[2]):.4f}",

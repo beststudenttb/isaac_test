@@ -24,6 +24,7 @@ import mdp_student_cfg as cfg
 parser = argparse.ArgumentParser(description="Train PPO student on MDP latent state.")
 parser.add_argument("--num-envs", type=int, default=None)
 parser.add_argument("--mdp", type=Path, default=None)
+parser.add_argument("--random-stop", action="store_true")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -67,6 +68,8 @@ TRAJ_FIELDS = [
     "env_id",
     "px_x",
     "dist",
+    "end_d",
+    "end_x",
     "a_x",
     "a_y",
     "a_w",
@@ -135,11 +138,33 @@ VAL_FIELDS = [
 
 
 def out_dir() -> Path:
-    path = Path(cfg.OUT_DIR)
+    path = Path(cfg.RANDOM_STOP_OUT_DIR) if args_cli.random_stop else Path(cfg.OUT_DIR)
     if bool(cfg.CLEAR_OUT_DIR) and path.exists():
         shutil.rmtree(path)
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def end_range() -> tuple[float, float, float, float]:
+    if args_cli.random_stop:
+        return (
+            float(cfg.RANDOM_END_D_MIN),
+            float(cfg.RANDOM_END_D_MAX),
+            float(cfg.RANDOM_END_X_MIN),
+            float(cfg.RANDOM_END_X_MAX),
+        )
+    return (
+        float(cfg.END_D_MIN),
+        float(cfg.END_D_MAX),
+        float(cfg.END_X_MIN),
+        float(cfg.END_X_MAX),
+    )
+
+
+def teacher_path() -> str:
+    if args_cli.random_stop:
+        return str(cfg.RANDOM_TEACHER_PATH)
+    return str(cfg.TEACHER_PATH)
 
 
 def write_config(path: Path, mdp_path: Path, obs_dim: int):
@@ -149,6 +174,8 @@ def write_config(path: Path, mdp_path: Path, obs_dim: int):
             lines.append(f"{name} = {getattr(cfg, name)!r}")
     lines.append(f"MDP_PATH_USED = {mdp_path!r}")
     lines.append(f"OBS_DIM = {int(obs_dim)!r}")
+    lines.append(f"RANDOM_STOP = {bool(args_cli.random_stop)!r}")
+    lines.append(f"TEACHER_PATH_USED = {teacher_path()!r}")
     lines.append(f"DEVICE_USED = {args_cli.device!r}")
     (path / "config.py").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -161,6 +188,7 @@ def open_csv(path: Path, fields: list[str]):
 
 
 def make_env():
+    end_d_min, end_d_max, end_x_min, end_x_max = end_range()
     env_cfg = MDPStudentEnvCfg()
     env_cfg.seed = int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
@@ -176,10 +204,10 @@ def make_env():
         render_kwargs["dlss_mode"] = int(cfg.DLSS_MODE)
     env_cfg.sim.render = sim_utils.RenderCfg(**render_kwargs)
     env_cfg.num_rerenders_on_reset = int(cfg.RERENDER_ON_RESET)
-    env_cfg.end_d_min = float(cfg.END_D_MIN)
-    env_cfg.end_d_max = float(cfg.END_D_MAX)
-    env_cfg.end_x_min = float(cfg.END_X_MIN)
-    env_cfg.end_x_max = float(cfg.END_X_MAX)
+    env_cfg.end_d_min = end_d_min
+    env_cfg.end_d_max = end_d_max
+    env_cfg.end_x_min = end_x_min
+    env_cfg.end_x_max = end_x_max
     return make_mdp_student_env(env_cfg)
 
 
@@ -227,7 +255,7 @@ def load_teacher(device: torch.device):
         and float(cfg.TEACHER_UP_TIMEOUT) <= 0.0
     ):
         return None
-    path = Path(cfg.TEACHER_PATH)
+    path = Path(teacher_path())
     if not path.exists():
         raise FileNotFoundError(f"teacher model not found: {path}")
     return PPO.load(str(path), device=device)
@@ -450,6 +478,8 @@ def traj_row(
     action = env.last_move_actions[env_id].detach().cpu().numpy()
     robot_xy = env.last_robot_xy[env_id].detach().cpu().numpy()
     target_xy = env.last_target_xy[env_id].detach().cpu().numpy()
+    end_d = env.end_d[env_id].detach().cpu().item()
+    end_x = env.end_x[env_id].detach().cpu().item()
     return {
         "phase": phase,
         "step": int(step),
@@ -458,6 +488,8 @@ def traj_row(
         "env_id": int(env_id),
         "px_x": f"{float(env.last_px_x[env_id].item()):.4f}",
         "dist": f"{float(env.last_dist[env_id].item()):.4f}",
+        "end_d": f"{float(end_d):.4f}",
+        "end_x": f"{float(end_x):.4f}",
         "a_x": f"{float(action[0]):.4f}",
         "a_y": f"{float(action[1]):.4f}",
         "a_w": f"{float(action[2]):.4f}",

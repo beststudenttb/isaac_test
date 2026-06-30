@@ -20,6 +20,6 @@ train_one() {
     --student
 }
 
-train_one xd
-train_one feature
+#train_one xd
+#train_one feature
 train_one shared

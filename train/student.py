@@ -23,6 +23,8 @@ import student_cfg
 
 parser = argparse.ArgumentParser(description="Train student with custom PPO.")
 parser.add_argument("--show", action="store_true")
+parser.add_argument("--random-stop", action="store_true")
+parser.add_argument("--teacher-loss", type=float, default=None)
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -63,6 +65,8 @@ TRAJ_FIELDS = [
     "env_id",
     "px_x",
     "dist",
+    "end_d",
+    "end_x",
     "a_x",
     "a_y",
     "a_w",
@@ -119,11 +123,39 @@ VAL_FIELDS = [
 
 
 def out_dir() -> Path:
-    path = Path(student_cfg.OUT_DIR)
+    path = Path(student_cfg.RANDOM_STOP_OUT_DIR) if args_cli.random_stop else Path(student_cfg.OUT_DIR)
     if bool(student_cfg.CLEAR_OUT_DIR) and path.exists():
         shutil.rmtree(path)
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def end_range() -> tuple[float, float, float, float]:
+    if args_cli.random_stop:
+        return (
+            float(student_cfg.RANDOM_END_D_MIN),
+            float(student_cfg.RANDOM_END_D_MAX),
+            float(student_cfg.RANDOM_END_X_MIN),
+            float(student_cfg.RANDOM_END_X_MAX),
+        )
+    return (
+        float(student_cfg.END_D_MIN),
+        float(student_cfg.END_D_MAX),
+        float(student_cfg.END_X_MIN),
+        float(student_cfg.END_X_MAX),
+    )
+
+
+def teacher_path() -> str:
+    if args_cli.random_stop:
+        return str(student_cfg.RANDOM_TEACHER_PATH)
+    return str(student_cfg.TEACHER_PATH)
+
+
+def teacher_loss_init() -> float:
+    if args_cli.teacher_loss is not None:
+        return float(args_cli.teacher_loss)
+    return float(student_cfg.TEACHER_LOSS)
 
 
 def write_config(path: Path):
@@ -131,6 +163,9 @@ def write_config(path: Path):
     for name in dir(student_cfg):
         if name.isupper():
             lines.append(f"{name} = {getattr(student_cfg, name)!r}")
+    lines.append(f"RANDOM_STOP = {bool(args_cli.random_stop)!r}")
+    lines.append(f"TEACHER_PATH_USED = {teacher_path()!r}")
+    lines.append(f"TEACHER_LOSS_USED = {teacher_loss_init()!r}")
     lines.append(f"DEVICE_USED = {args_cli.device!r}")
     (path / "config.py").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -143,6 +178,7 @@ def open_csv(path: Path, fields: list[str]):
 
 
 def make_env() -> BallPPOEnv:
+    end_d_min, end_d_max, end_x_min, end_x_max = end_range()
     cfg = BallPPOEnvCfg()
     cfg.seed = int(student_cfg.SEED)
     cfg.episode_length_s = float(student_cfg.EPISODE_S)
@@ -151,10 +187,10 @@ def make_env() -> BallPPOEnv:
     cfg.sim.device = args_cli.device
     cfg.use_camera = bool(student_cfg.USE_CAMERA)
     cfg.read_camera = bool(student_cfg.READ_CAMERA)
-    cfg.end_d_min = float(student_cfg.END_D_MIN)
-    cfg.end_d_max = float(student_cfg.END_D_MAX)
-    cfg.end_x_min = float(student_cfg.END_X_MIN)
-    cfg.end_x_max = float(student_cfg.END_X_MAX)
+    cfg.end_d_min = end_d_min
+    cfg.end_d_max = end_d_max
+    cfg.end_x_min = end_x_min
+    cfg.end_x_max = end_x_max
     return BallPPOEnv(cfg)
 
 
@@ -187,12 +223,12 @@ def save_model(
 
 def load_teacher(device: torch.device):
     if (
-        float(student_cfg.TEACHER_LOSS) <= 0.0
+        teacher_loss_init() <= 0.0
         and float(student_cfg.TEACHER_UP_OUT) <= 0.0
         and float(student_cfg.TEACHER_UP_TIMEOUT) <= 0.0
     ):
         return None
-    path = Path(student_cfg.TEACHER_PATH)
+    path = Path(teacher_path())
     if not path.exists():
         raise FileNotFoundError(f"teacher model not found: {path}")
     return PPO.load(str(path), device=device)
@@ -218,6 +254,8 @@ def traj_row(
     action = env.last_move_actions[env_id].detach().cpu().numpy()
     robot_xy = env.last_robot_xy[env_id].detach().cpu().numpy()
     target_xy = env.last_target_xy[env_id].detach().cpu().numpy()
+    end_d = env.end_d[env_id].detach().cpu().item()
+    end_x = env.end_x[env_id].detach().cpu().item()
     return {
         "phase": phase,
         "step": int(step),
@@ -226,6 +264,8 @@ def traj_row(
         "env_id": int(env_id),
         "px_x": f"{float(env.last_px_x[env_id].item()):.4f}",
         "dist": f"{float(env.last_dist[env_id].item()):.4f}",
+        "end_d": f"{float(end_d):.4f}",
+        "end_x": f"{float(end_x):.4f}",
         "a_x": f"{float(action[0]):.4f}",
         "a_y": f"{float(action[1]):.4f}",
         "a_w": f"{float(action[2]):.4f}",
@@ -354,7 +394,7 @@ def main():
     ).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=float(student_cfg.LR), eps=1e-5)
     teacher = load_teacher(device)
-    teacher_coef = float(student_cfg.TEACHER_LOSS)
+    teacher_coef = teacher_loss_init()
     teacher_min = float(student_cfg.TEACHER_LOSS_MIN)
     teacher_down_success = float(student_cfg.TEACHER_DOWN_SUCCESS)
     teacher_up_out = float(student_cfg.TEACHER_UP_OUT)
@@ -371,7 +411,7 @@ def main():
     print(
         f"[INFO] student PPO out={log_dir} envs={env.num_envs} total_steps={total_steps} "
         f"updates={updates} n_steps={student_cfg.N_STEPS} device={env.device} camera={int(student_cfg.USE_CAMERA)} "
-        f"teacher_loss={teacher_coef:.3f}"
+        f"random_stop={args_cli.random_stop} teacher_loss={teacher_coef:.3f}"
     )
 
     try:

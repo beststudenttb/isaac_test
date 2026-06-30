@@ -1,0 +1,11 @@
+checkpoint = update_000034.zip
+update = 34
+step = 1114112
+num_envs = 512
+num_episodes = 1
+episodes = 512
+success_rate = 0.986328125
+fail_rate = 0.0
+timeout_rate = 0.013671875
+mean_return = 22.854386302745297
+mean_len = 163.044921875

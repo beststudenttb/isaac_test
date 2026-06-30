@@ -24,6 +24,7 @@ parser.add_argument("--num-envs", type=int, default=None)
 parser.add_argument("--num-episodes", type=int, default=int(cfg.NUM_EPISODES))
 parser.add_argument("--start", type=int, default=int(cfg.START))
 parser.add_argument("--stride", type=int, default=int(cfg.STRIDE))
+parser.add_argument("--random-stop", action="store_true")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -63,10 +64,27 @@ VAL_FIELDS = [
 
 
 def run_dir() -> Path:
-    return Path(cfg.OUT_DIR)
+    return Path(cfg.RANDOM_STOP_OUT_DIR) if args_cli.random_stop else Path(cfg.OUT_DIR)
+
+
+def end_range() -> tuple[float, float, float, float]:
+    if args_cli.random_stop:
+        return (
+            float(cfg.RANDOM_END_D_MIN),
+            float(cfg.RANDOM_END_D_MAX),
+            float(cfg.RANDOM_END_X_MIN),
+            float(cfg.RANDOM_END_X_MAX),
+        )
+    return (
+        float(cfg.END_D_MIN),
+        float(cfg.END_D_MAX),
+        float(cfg.END_X_MIN),
+        float(cfg.END_X_MAX),
+    )
 
 
 def make_env():
+    end_d_min, end_d_max, end_x_min, end_x_max = end_range()
     env_cfg = BallPPOEnvCfg()
     env_cfg.seed = int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
@@ -75,10 +93,10 @@ def make_env():
     env_cfg.sim.device = args_cli.device
     env_cfg.use_camera = bool(cfg.USE_CAMERA)
     env_cfg.read_camera = bool(cfg.READ_CAMERA)
-    env_cfg.end_d_min = float(cfg.END_D_MIN)
-    env_cfg.end_d_max = float(cfg.END_D_MAX)
-    env_cfg.end_x_min = float(cfg.END_X_MIN)
-    env_cfg.end_x_max = float(cfg.END_X_MAX)
+    env_cfg.end_d_min = end_d_min
+    env_cfg.end_d_max = end_d_max
+    env_cfg.end_x_min = end_x_min
+    env_cfg.end_x_max = end_x_max
     return make_sb3_env(env_cfg, fast_variant=True)
 
 
@@ -211,8 +229,10 @@ def best_key(row: dict) -> tuple:
 
 def write_config(path: Path, env):
     base_env = env.unwrapped
+    end_d_min, end_d_max, end_x_min, end_x_max = end_range()
     lines = [
         "run_name = 'teacher_ppo'",
+        f"random_stop = {bool(args_cli.random_stop)!r}",
         f"num_envs = {env.num_envs!r}",
         f"num_episodes = {int(args_cli.num_episodes)!r}",
         f"start = {int(args_cli.start)!r}",
@@ -225,12 +245,27 @@ def write_config(path: Path, env):
         f"device = {base_env.device!r}",
         f"use_camera = {bool(cfg.USE_CAMERA)!r}",
         f"read_camera = {bool(cfg.READ_CAMERA)!r}",
-        f"end_d_min = {float(cfg.END_D_MIN)!r}",
-        f"end_d_max = {float(cfg.END_D_MAX)!r}",
-        f"end_x_min = {float(cfg.END_X_MIN)!r}",
-        f"end_x_max = {float(cfg.END_X_MAX)!r}",
+        f"end_d_min = {end_d_min!r}",
+        f"end_d_max = {end_d_max!r}",
+        f"end_x_min = {end_x_min!r}",
+        f"end_x_max = {end_x_max!r}",
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+class TrajBuffer:
+    def __init__(self):
+        self.rows = []
+
+    def writerow(self, row: dict):
+        self.rows.append(dict(row))
+
+
+def write_traj(path: Path, rows: list[dict]):
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=TRAJ_FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def main():
@@ -268,7 +303,7 @@ def main():
     print(
         f"[INFO] offline val run=teacher_ppo updates={len(update_paths)} "
         f"envs={env.num_envs} num_episodes={args_cli.num_episodes} start={args_cli.start} "
-        f"stride={args_cli.stride} device={env.unwrapped.device}"
+        f"stride={args_cli.stride} random_stop={args_cli.random_stop} device={env.unwrapped.device}"
     )
     try:
         mode = "a" if int(args_cli.start) > 0 else "w"
@@ -281,7 +316,8 @@ def main():
             for path in update_paths:
                 model, update = load_model(path)
                 step = int(model.num_timesteps)
-                info = val(env, model, int(args_cli.num_episodes), update, step, env0_traj_writer=env0_writer)
+                traj_buf = TrajBuffer()
+                info = val(env, model, int(args_cli.num_episodes), update, step, traj_buf, env0_traj_writer=env0_writer)
                 row = {
                     "checkpoint": path.name,
                     "update": update,
@@ -297,6 +333,13 @@ def main():
                 if best_row is None or best_key(row) > best_key(best_row):
                     best_row = row
                     best_path = path
+                    shutil.copy2(best_path, root / "best_offline.zip")
+                    shutil.copy2(best_path, root / "best_val.zip")
+                    (root / "best_offline_info.txt").write_text(
+                        "\n".join(f"{key} = {value}" for key, value in best_row.items()) + "\n",
+                        encoding="utf-8",
+                    )
+                    write_traj(root / "traj_best_offline.csv", traj_buf.rows)
                 print_log(
                     [
                         ("model", [("checkpoint", row["checkpoint"]), ("update", row["update"]), ("step", row["step"])]),
@@ -316,24 +359,6 @@ def main():
 
         if best_row is None or best_path is None:
             raise RuntimeError("offline val did not produce best checkpoint")
-        shutil.copy2(best_path, root / "best_offline.zip")
-        shutil.copy2(best_path, root / "best_val.zip")
-        (root / "best_offline_info.txt").write_text(
-            "\n".join(f"{key} = {value}" for key, value in best_row.items()) + "\n",
-            encoding="utf-8",
-        )
-        best_model, _best_update = load_model(best_path)
-        with (root / "traj_best_offline.csv").open("w", newline="", encoding="utf-8") as traj_file:
-            traj_writer = csv.DictWriter(traj_file, fieldnames=TRAJ_FIELDS)
-            traj_writer.writeheader()
-            val(
-                env,
-                best_model,
-                int(args_cli.num_episodes),
-                int(best_row["update"]),
-                int(best_row["step"]),
-                traj_writer,
-            )
         print(
             f"[INFO] best checkpoint={best_path.name} success={best_row['success_rate']:.3f} "
             f"fail={best_row['fail_rate']:.3f} timeout={best_row['timeout_rate']:.3f}"

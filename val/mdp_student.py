@@ -25,6 +25,7 @@ parser.add_argument("--num-episodes", type=int, default=int(cfg.NUM_EPISODES))
 parser.add_argument("--start", type=int, default=int(cfg.START))
 parser.add_argument("--stride", type=int, default=int(cfg.STRIDE))
 parser.add_argument("--mdp", type=Path, default=None)
+parser.add_argument("--random-stop", action="store_true")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -81,6 +82,8 @@ TRAJ_FIELDS = [
     "env_id",
     "px_x",
     "dist",
+    "end_d",
+    "end_x",
     "a_x",
     "a_y",
     "a_w",
@@ -98,7 +101,23 @@ TRAJ_FIELDS = [
 
 
 def root_dir() -> Path:
-    return Path(cfg.OUT_DIR)
+    return Path(cfg.RANDOM_STOP_OUT_DIR) if args_cli.random_stop else Path(cfg.OUT_DIR)
+
+
+def end_range() -> tuple[float, float, float, float]:
+    if args_cli.random_stop:
+        return (
+            float(cfg.RANDOM_END_D_MIN),
+            float(cfg.RANDOM_END_D_MAX),
+            float(cfg.RANDOM_END_X_MIN),
+            float(cfg.RANDOM_END_X_MAX),
+        )
+    return (
+        float(cfg.END_D_MIN),
+        float(cfg.END_D_MAX),
+        float(cfg.END_X_MIN),
+        float(cfg.END_X_MAX),
+    )
 
 
 def update_num(path: Path) -> int:
@@ -106,6 +125,7 @@ def update_num(path: Path) -> int:
 
 
 def make_env() -> MDPStudentEnv:
+    end_d_min, end_d_max, end_x_min, end_x_max = end_range()
     env_cfg = MDPStudentEnvCfg()
     env_cfg.seed = int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
@@ -121,10 +141,10 @@ def make_env() -> MDPStudentEnv:
         render_kwargs["dlss_mode"] = int(cfg.DLSS_MODE)
     env_cfg.sim.render = sim_utils.RenderCfg(**render_kwargs)
     env_cfg.num_rerenders_on_reset = int(cfg.RERENDER_ON_RESET)
-    env_cfg.end_d_min = float(cfg.END_D_MIN)
-    env_cfg.end_d_max = float(cfg.END_D_MAX)
-    env_cfg.end_x_min = float(cfg.END_X_MIN)
-    env_cfg.end_x_max = float(cfg.END_X_MAX)
+    env_cfg.end_d_min = end_d_min
+    env_cfg.end_d_max = end_d_max
+    env_cfg.end_x_min = end_x_min
+    env_cfg.end_x_max = end_x_max
     return make_mdp_student_env(env_cfg)
 
 
@@ -209,6 +229,8 @@ def traj_row(
     action = env.last_move_actions[env_id].detach().cpu().numpy()
     robot_xy = env.last_robot_xy[env_id].detach().cpu().numpy()
     target_xy = env.last_target_xy[env_id].detach().cpu().numpy()
+    end_d = env.end_d[env_id].detach().cpu().item()
+    end_x = env.end_x[env_id].detach().cpu().item()
     return {
         "phase": phase,
         "step": int(step),
@@ -217,6 +239,8 @@ def traj_row(
         "env_id": int(env_id),
         "px_x": f"{float(env.last_px_x[env_id].item()):.4f}",
         "dist": f"{float(env.last_dist[env_id].item()):.4f}",
+        "end_d": f"{float(end_d):.4f}",
+        "end_x": f"{float(end_x):.4f}",
         "a_x": f"{float(action[0]):.4f}",
         "a_y": f"{float(action[1]):.4f}",
         "a_w": f"{float(action[2]):.4f}",
@@ -383,6 +407,7 @@ def write_config(path: Path, env: MDPStudentEnv):
         f"num_episodes = {int(args_cli.num_episodes)!r}",
         f"start = {int(args_cli.start)!r}",
         f"stride = {int(args_cli.stride)!r}",
+        f"random_stop = {bool(args_cli.random_stop)!r}",
         f"episodes_per_checkpoint = {env.num_envs * int(args_cli.num_episodes)!r}",
         f"val_steps = {int(cfg.VAL_STEPS)!r}",
         f"episode_s = {float(cfg.EPISODE_S)!r}",
@@ -391,6 +416,21 @@ def write_config(path: Path, env: MDPStudentEnv):
         f"device = {env.device!r}",
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+class TrajBuffer:
+    def __init__(self):
+        self.rows = []
+
+    def writerow(self, row: dict):
+        self.rows.append(dict(row))
+
+
+def write_traj(path: Path, rows: list[dict]):
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=TRAJ_FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def main():
@@ -457,6 +497,7 @@ def main():
                 update = int(policy_ckpt.get("update", policy_update))
                 step = int(policy_ckpt.get("step", -1))
                 mdp_update = update_num(mdp_path) if mdp_path.parent.name == "mdp_updates" else 0
+                traj_buf = TrajBuffer()
                 info = val(
                     env,
                     mdp,
@@ -464,6 +505,7 @@ def main():
                     int(args_cli.num_episodes),
                     update,
                     step,
+                    traj_buf,
                     env0_traj_writer=env0_writer,
                 )
                 row = {
@@ -484,6 +526,14 @@ def main():
                     best_row = row
                     best_policy_path = policy_path
                     best_mdp_path = mdp_path
+                    shutil.copy2(best_policy_path, root / "best_offline.pt")
+                    if best_mdp_path.parent.name == "mdp_updates":
+                        shutil.copy2(best_mdp_path, root / "best_offline_mdp.pt")
+                    (root / "best_offline_info.txt").write_text(
+                        "\n".join(f"{key} = {value}" for key, value in best_row.items()) + "\n",
+                        encoding="utf-8",
+                    )
+                    write_traj(root / "traj_best_offline.csv", traj_buf.rows)
                 print_log(
                     [
                         (
@@ -510,28 +560,6 @@ def main():
 
         if best_row is None or best_policy_path is None or best_mdp_path is None:
             raise RuntimeError("offline val did not produce best checkpoint")
-        shutil.copy2(best_policy_path, root / "best_offline.pt")
-        if best_mdp_path.parent.name == "mdp_updates":
-            shutil.copy2(best_mdp_path, root / "best_offline_mdp.pt")
-        (root / "best_offline_info.txt").write_text(
-            "\n".join(f"{key} = {value}" for key, value in best_row.items()) + "\n",
-            encoding="utf-8",
-        )
-
-        best_mdp = load_mdp(best_mdp_path, device)
-        best_model, _ = load_policy(best_policy_path, int(best_mdp.belief_dim + best_mdp.z_dim), device)
-        with (root / "traj_best_offline.csv").open("w", newline="", encoding="utf-8") as traj_file:
-            traj_writer = csv.DictWriter(traj_file, fieldnames=TRAJ_FIELDS)
-            traj_writer.writeheader()
-            val(
-                env,
-                best_mdp,
-                best_model,
-                int(args_cli.num_episodes),
-                int(best_row["update"]),
-                int(best_row["step"]),
-                traj_writer,
-            )
         print(
             f"[INFO] best checkpoint={best_policy_path.name} mdp={best_mdp_path.name} "
             f"success={best_row['success_rate']:.3f} fail={best_row['fail_rate']:.3f} timeout={best_row['timeout_rate']:.3f}"

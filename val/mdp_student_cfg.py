@@ -4,6 +4,7 @@ from pathlib import Path
 
 
 OUT_DIR = Path("./models/rl/mdp_student")  # MDP student 输出目录。
+RANDOM_STOP_OUT_DIR = Path("./models/rl/mdp_student_random_stop")  # --random-stop 时的输出目录。
 MDP_PATH = Path("./models/vision/mdp_state_priv_probe_grad/last.pt")  # 预训练 MDP state checkpoint。
 
 NUM_ENVS = 32  # 离线 val 默认并行环境数量。
@@ -25,6 +26,10 @@ END_D_MIN = 1.5  # state/reward 里的停止距离最小值，单位 m。
 END_D_MAX = 1.5  # state/reward 里的停止距离最大值，单位 m。
 END_X_MIN = 0.0  # state/reward 里的图像停止位置最小值，单位 px，0 表示图像中心。
 END_X_MAX = 0.0  # state/reward 里的图像停止位置最大值，单位 px。
+RANDOM_END_D_MIN = 1.3  # --random-stop 时的停止距离最小值，单位 m。
+RANDOM_END_D_MAX = 1.8  # --random-stop 时的停止距离最大值，单位 m。
+RANDOM_END_X_MIN = -20.0  # --random-stop 时的图像停止位置最小值，单位 px。
+RANDOM_END_X_MAX = 20.0  # --random-stop 时的图像停止位置最大值，单位 px。
 
 FREEZE_MDP_BACKBONE = True  # val 时保持 MDP backbone 冻结。
 

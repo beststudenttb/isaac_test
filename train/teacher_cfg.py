@@ -4,12 +4,13 @@ from pathlib import Path
 
 
 OUT_DIR = Path("./models/rl/teacher_ppo")  # 训练现场输出目录，不上传 Git。
+RANDOM_STOP_OUT_DIR = Path("./models/rl/teacher_ppo_random_stop")  # --random-stop 时的输出目录。
 CLEAR_OUT_DIR = True  # 每次开始训练前清空 OUT_DIR。
 
 NUM_ENVS = 512  # 并行环境数量。
 TOTAL_STEPS = 8_192_000  # SB3 total_timesteps，所有 env 合计 transition 数。
 EPISODE_S = 15.0  # 单个 episode 最长仿真时间，单位秒。
-STOP_N = 5  # 连续多少 step stop 后 success done。
+STOP_N = 1  # 训练时只要在 stop 区输出一次 stop 就 success done。
 SEED = 0  # 随机种子。
 DEVICE = None  # None 表示使用 IsaacLab 默认或命令行 --device。
 USE_CAMERA = False  # 是否在 teacher 训练环境里启用相机。
@@ -19,6 +20,11 @@ END_D_MIN = 1.5  # teacher state/reward 里的停止距离最小值，单位 m�
 END_D_MAX = 1.5  # teacher state/reward 里的停止距离最大值，单位 m。
 END_X_MIN = 0.0  # teacher state/reward 里的图像停止位置最小值，单位 px，0 表示图像中心。
 END_X_MAX = 0.0  # teacher state/reward 里的图像停止位置最大值，单位 px。
+
+RANDOM_END_D_MIN = 1.3  # --random-stop 时的停止距离最小值，单位 m。
+RANDOM_END_D_MAX = 1.8  # --random-stop 时的停止距离最大值，单位 m。
+RANDOM_END_X_MIN = -20.0  # --random-stop 时的图像停止位置最小值，单位 px。
+RANDOM_END_X_MAX = 20.0  # --random-stop 时的图像停止位置最大值，单位 px。
 
 N_STEPS = 64  # PPO 每个 env 每次 rollout 的 step 数。
 BATCH_SIZE = 1024  # PPO minibatch 大小。

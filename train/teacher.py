@@ -22,6 +22,7 @@ import teacher_cfg
 
 parser = argparse.ArgumentParser(description="Train privileged teacher PPO.")
 parser.add_argument("--show", action="store_true")
+parser.add_argument("--random-stop", action="store_true")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -57,16 +58,34 @@ ACTIVATIONS = {
 
 
 def make_out_dir() -> Path:
-    out_dir = teacher_cfg.OUT_DIR
+    out_dir = teacher_cfg.RANDOM_STOP_OUT_DIR if args_cli.random_stop else teacher_cfg.OUT_DIR
     if bool(teacher_cfg.CLEAR_OUT_DIR) and out_dir.exists():
         shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     return out_dir
 
 
+def end_range() -> tuple[float, float, float, float]:
+    if args_cli.random_stop:
+        return (
+            float(teacher_cfg.RANDOM_END_D_MIN),
+            float(teacher_cfg.RANDOM_END_D_MAX),
+            float(teacher_cfg.RANDOM_END_X_MIN),
+            float(teacher_cfg.RANDOM_END_X_MAX),
+        )
+    return (
+        float(teacher_cfg.END_D_MIN),
+        float(teacher_cfg.END_D_MAX),
+        float(teacher_cfg.END_X_MIN),
+        float(teacher_cfg.END_X_MAX),
+    )
+
+
 def write_config(out_dir: Path):
+    end_d_min, end_d_max, end_x_min, end_x_max = end_range()
     lines = [
-        f"out_dir = {str(teacher_cfg.OUT_DIR)!r}",
+        f"out_dir = {str(out_dir)!r}",
+        f"random_stop = {bool(args_cli.random_stop)}",
         f"clear_out_dir = {bool(teacher_cfg.CLEAR_OUT_DIR)}",
         f"num_envs = {int(teacher_cfg.NUM_ENVS)}",
         f"total_steps = {int(teacher_cfg.TOTAL_STEPS)}",
@@ -74,10 +93,10 @@ def write_config(out_dir: Path):
         f"seed = {int(teacher_cfg.SEED)}",
         f"use_camera = {bool(teacher_cfg.USE_CAMERA)}",
         f"read_camera = {bool(teacher_cfg.READ_CAMERA)}",
-        f"end_d_min = {float(teacher_cfg.END_D_MIN)}",
-        f"end_d_max = {float(teacher_cfg.END_D_MAX)}",
-        f"end_x_min = {float(teacher_cfg.END_X_MIN)}",
-        f"end_x_max = {float(teacher_cfg.END_X_MAX)}",
+        f"end_d_min = {end_d_min}",
+        f"end_d_max = {end_d_max}",
+        f"end_x_min = {end_x_min}",
+        f"end_x_max = {end_x_max}",
         f"n_steps = {int(teacher_cfg.N_STEPS)}",
         f"batch_size = {int(teacher_cfg.BATCH_SIZE)}",
         f"n_epochs = {int(teacher_cfg.N_EPOCHS)}",
@@ -121,6 +140,7 @@ def write_config(out_dir: Path):
 
 
 def make_cfg() -> BallPPOEnvCfg:
+    end_d_min, end_d_max, end_x_min, end_x_max = end_range()
     cfg = BallPPOEnvCfg()
     cfg.seed = int(teacher_cfg.SEED)
     cfg.episode_length_s = float(teacher_cfg.EPISODE_S)
@@ -129,10 +149,10 @@ def make_cfg() -> BallPPOEnvCfg:
     cfg.sim.device = args_cli.device
     cfg.use_camera = bool(teacher_cfg.USE_CAMERA)
     cfg.read_camera = bool(teacher_cfg.READ_CAMERA)
-    cfg.end_d_min = float(teacher_cfg.END_D_MIN)
-    cfg.end_d_max = float(teacher_cfg.END_D_MAX)
-    cfg.end_x_min = float(teacher_cfg.END_X_MIN)
-    cfg.end_x_max = float(teacher_cfg.END_X_MAX)
+    cfg.end_d_min = end_d_min
+    cfg.end_d_max = end_d_max
+    cfg.end_x_min = end_x_min
+    cfg.end_x_max = end_x_max
     return cfg
 
 
@@ -240,7 +260,8 @@ def main():
 
     print(
         f"[INFO] train teacher out={out_dir} envs={teacher_cfg.NUM_ENVS} "
-        f"total_steps={teacher_cfg.TOTAL_STEPS} episode_s={teacher_cfg.EPISODE_S} device={args_cli.device}"
+        f"total_steps={teacher_cfg.TOTAL_STEPS} episode_s={teacher_cfg.EPISODE_S} "
+        f"random_stop={args_cli.random_stop} device={args_cli.device}"
     )
     start = time.perf_counter()
     try:

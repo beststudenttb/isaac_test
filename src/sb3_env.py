@@ -25,6 +25,7 @@ class BallPPOEnvCfg(BallEnvCfg):
     fail_far = task_cfg.FAIL_FAR
 
     k_search = task_cfg.K_SEARCH
+    k_search_w = task_cfg.K_SEARCH_W
     k_time = task_cfg.K_TIME
     k_x = task_cfg.K_X
     k_d = task_cfg.K_D
@@ -198,7 +199,8 @@ class BallPPOEnv(BallEnv):
 
         reward += torch.where(
             ~seen,
-            -self.cfg.k_search * (self.actions[:, 0] ** 2 + self.actions[:, 1] ** 2),
+            -self.cfg.k_search * (self.actions[:, 0] ** 2 + self.actions[:, 1] ** 2)
+            + self.cfg.k_search_w * torch.abs(self.actions[:, 2]),
             torch.zeros_like(reward),
         )
         reward += torch.where(seen, torch.full_like(reward, -self.cfg.k_time), torch.zeros_like(reward))
@@ -206,7 +208,7 @@ class BallPPOEnv(BallEnv):
         a_mag = torch.max(torch.abs(self.actions), dim=1).values
         app = seen & self.prev_seen & (~stop)
         x_gain = (self.prev_xe - xe) / self.cfg.image_width
-        d_gain = (self.prev_de - de) / (self.cfg.dist_max - self.cfg.fail_near)
+        d_gain = (self.prev_de - de) / self.cfg.fail_far
         reward += torch.where(
             app,
             self.cfg.k_x * x_gain + self.cfg.k_d * d_gain,
@@ -246,7 +248,7 @@ class BallPPOEnv(BallEnv):
             if self.terminal_end_obs is None or self.terminal_end_obs.shape != end_obs.shape:
                 self.terminal_end_obs = torch.empty_like(end_obs)
             self.terminal_end_obs[done] = end_obs[done]
-        reward += torch.where(success, torch.full_like(reward, self.cfg.r_success), 0.0)
+        reward += torch.where(success, self.cfg.r_success * stop_q, 0.0)
         reward += torch.where(fail & (~success), torch.full_like(reward, self.cfg.r_fail), 0.0)
 
         self.prev_seen = seen

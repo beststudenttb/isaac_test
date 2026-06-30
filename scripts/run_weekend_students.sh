@@ -4,14 +4,15 @@ set -e
 cd "$(dirname "$0")/.."
 
 CV_MODEL="${CV_MODEL:-old}"
-CV_STATES="${CV_STATES:-xd shared}"
-CV_ENVS="${CV_ENVS:-128}"
+CV_STATES="${CV_STATES:-shared}"
+CV_ENVS="${CV_ENVS:-64}"
 MDP_ENVS="${MDP_ENVS:-64}"
-VAL_ENVS="${VAL_ENVS:-32}"
+VAL_ENVS="${VAL_ENVS:-128}"
 VAL_EPISODES="${VAL_EPISODES:-1}"
 VAL_START="${VAL_START:-0}"
 VAL_STRIDE="${VAL_STRIDE:-10}"
 MDP_CKPT="${MDP_CKPT:-./models/vision/mdp_state_priv_probe_grad/last.pt}"
+RANDOM_STOP_FLAG=(--random-stop)
 
 for STATE in ${CV_STATES}; do
   echo "[INFO] train vision student cv-model=${CV_MODEL} state=${STATE}"
@@ -19,6 +20,7 @@ for STATE in ${CV_STATES}; do
     --cv-model "${CV_MODEL}" \
     --state "${STATE}" \
     --num-envs "${CV_ENVS}" \
+    "${RANDOM_STOP_FLAG[@]}" \
     --student
 
   echo "[INFO] val vision student cv-model=${CV_MODEL} state=${STATE}"
@@ -29,13 +31,15 @@ for STATE in ${CV_STATES}; do
     --num-episodes "${VAL_EPISODES}" \
     --start "${VAL_START}" \
     --stride "${VAL_STRIDE}" \
+    "${RANDOM_STOP_FLAG[@]}" \
     --student
 done
 
 echo "[INFO] train MDP student mdp=${MDP_CKPT}"
 ./IsaacLab/isaaclab.sh -p train/mdp_student.py \
   --num-envs "${MDP_ENVS}" \
-  --mdp "${MDP_CKPT}"
+  --mdp "${MDP_CKPT}" \
+  "${RANDOM_STOP_FLAG[@]}"
 
 echo "[INFO] val MDP student mdp=${MDP_CKPT}"
 ./IsaacLab/isaaclab.sh -p val/mdp_student.py \
@@ -43,4 +47,5 @@ echo "[INFO] val MDP student mdp=${MDP_CKPT}"
   --num-episodes "${VAL_EPISODES}" \
   --start "${VAL_START}" \
   --stride "${VAL_STRIDE}" \
-  --mdp "${MDP_CKPT}"
+  --mdp "${MDP_CKPT}" \
+  "${RANDOM_STOP_FLAG[@]}"

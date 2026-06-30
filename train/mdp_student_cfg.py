@@ -4,12 +4,13 @@ from pathlib import Path
 
 
 OUT_DIR = Path("./models/rl/mdp_student")  # MDP latent student PPO 输出目录。
+RANDOM_STOP_OUT_DIR = Path("./models/rl/mdp_student_random_stop")  # --random-stop 时的输出目录。
 CLEAR_OUT_DIR = True  # 每次从头训练前清空 OUT_DIR。
 
 NUM_ENVS = 64  # 并行环境数量。
 TOTAL_STEPS = 8_192_000  # 总采样步数，按 SB3 total_timesteps 语义。
 EPISODE_S = 15.0  # 单个 episode 最长仿真时间，单位秒。
-STOP_N = 3  # 连续多少 step stop 后 success done。
+STOP_N = 1  # 训练时只要在 stop 区输出一次 stop 就 success done。
 SEED = 1  # 随机种子。
 DEVICE = None  # None 表示使用 IsaacLab 命令行 device。
 
@@ -21,6 +22,10 @@ END_D_MIN = 1.5  # state/reward 里的停止距离最小值，单位 m。
 END_D_MAX = 1.5  # state/reward 里的停止距离最大值，单位 m。
 END_X_MIN = 0.0  # state/reward 里的图像停止位置最小值，单位 px，0 表示图像中心。
 END_X_MAX = 0.0  # state/reward 里的图像停止位置最大值，单位 px。
+RANDOM_END_D_MIN = 1.3  # --random-stop 时的停止距离最小值，单位 m。
+RANDOM_END_D_MAX = 1.8  # --random-stop 时的停止距离最大值，单位 m。
+RANDOM_END_X_MIN = -20.0  # --random-stop 时的图像停止位置最小值，单位 px。
+RANDOM_END_X_MAX = 20.0  # --random-stop 时的图像停止位置最大值，单位 px。
 
 MDP_PATH = Path("./models/vision/mdp_state_priv_probe_grad/last.pt")  # 预训练 MDP state checkpoint。
 FREEZE_MDP_BACKBONE = True  # 在线微调 MDP 时冻结 ResNet backbone。
@@ -43,6 +48,7 @@ MDP_DONE_W = 0.2  # MDP done 预测 loss 权重。
 MDP_VALUE_W = 0.1  # MDP value 预测 loss 权重。
 
 TEACHER_PATH = "./models/rl/teacher_ppo/best_val.zip"  # teacher SB3 PPO 模型路径。
+RANDOM_TEACHER_PATH = "./models/rl/teacher_ppo_random_stop/best_val.zip"  # --random-stop 时的 teacher 路径。
 TEACHER_LOSS = 1.0  # teacher imitation loss 权重；0 表示关闭。
 TEACHER_LOSS_MIN = 0.01  # teacher imitation loss 权重下限。
 TEACHER_DOWN_MDP = 0.3  # 每次 MDP 更新后固定降低的 teacher imitation loss 权重。
