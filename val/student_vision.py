@@ -36,11 +36,13 @@ STATE_ALIAS = {
 parser = argparse.ArgumentParser(description="Offline validate vision student update checkpoints.")
 parser.add_argument("--state", choices=["xd", "shared", "feature"], required=True)
 parser.add_argument("--cv-model", choices=["old", "old-m", "resnet", "mobile"], required=True)
+parser.add_argument("--cv-ckpt", type=Path, default=None)
 parser.add_argument("--num-envs", type=int, default=None)
 parser.add_argument("--num-episodes", type=int, default=int(cfg.NUM_EPISODES))
 parser.add_argument("--start", type=int, default=int(cfg.START))
 parser.add_argument("--stride", type=int, default=int(cfg.STRIDE))
 parser.add_argument("--random-stop", action="store_true")
+parser.add_argument("--noise", action="store_true")
 mode_group = parser.add_mutually_exclusive_group(required=True)
 mode_group.add_argument("--student", action="store_true")
 mode_group.add_argument("--teacher", action="store_true")
@@ -70,6 +72,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src import task_cfg
 from src.cv_extractor.simple_cnn import BallVisionNet, MobileBallNet, OldBallVisionNet, OldMobileBallNet
+from src.noise_env import NoisePPOEnv, NoisePPOEnvCfg
 from src.ppo import ActorCritic
 from src.sb3_env import BallPPOEnv, BallPPOEnvCfg
 
@@ -138,7 +141,10 @@ def vision_choice() -> dict:
     state = STATE_ALIAS[str(args_cli.state)]
     for choice in cfg.VISION_CHOICES.values():
         if str(choice["model"]) == model and str(choice["state"]) == state:
-            return choice
+            selected = dict(choice)
+            if args_cli.cv_ckpt is not None:
+                selected["ckpt"] = args_cli.cv_ckpt
+            return selected
     raise ValueError(f"state={args_cli.state} is not available for cv-model={args_cli.cv_model}")
 
 
@@ -169,7 +175,7 @@ def end_range() -> tuple[float, float, float, float]:
 
 def make_env() -> BallPPOEnv:
     end_d_min, end_d_max, end_x_min, end_x_max = end_range()
-    env_cfg = BallPPOEnvCfg()
+    env_cfg = NoisePPOEnvCfg() if args_cli.noise else BallPPOEnvCfg()
     env_cfg.seed = int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
     env_cfg.stop_n = int(cfg.STOP_N)
@@ -182,7 +188,8 @@ def make_env() -> BallPPOEnv:
     env_cfg.end_d_max = end_d_max
     env_cfg.end_x_min = end_x_min
     env_cfg.end_x_max = end_x_max
-    return BallPPOEnv(env_cfg)
+    env_cls = NoisePPOEnv if args_cli.noise else BallPPOEnv
+    return env_cls(env_cfg)
 
 
 def load_encoder(device: torch.device) -> nn.Module:

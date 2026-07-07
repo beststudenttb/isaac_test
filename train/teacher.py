@@ -23,6 +23,7 @@ import teacher_cfg
 parser = argparse.ArgumentParser(description="Train privileged teacher PPO.")
 parser.add_argument("--show", action="store_true")
 parser.add_argument("--random-stop", action="store_true")
+parser.add_argument("--noise", action="store_true")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -45,6 +46,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.noise_env import NoisePPOEnvCfg, make_noise_sb3_env
 from src.sb3_env import BallPPOEnvCfg, make_sb3_env
 from src.val_callback import TrainTrajCallback
 
@@ -86,6 +88,7 @@ def write_config(out_dir: Path):
     lines = [
         f"out_dir = {str(out_dir)!r}",
         f"random_stop = {bool(args_cli.random_stop)}",
+        f"noise = {bool(args_cli.noise)}",
         f"clear_out_dir = {bool(teacher_cfg.CLEAR_OUT_DIR)}",
         f"num_envs = {int(teacher_cfg.NUM_ENVS)}",
         f"total_steps = {int(teacher_cfg.TOTAL_STEPS)}",
@@ -141,7 +144,7 @@ def write_config(out_dir: Path):
 
 def make_cfg() -> BallPPOEnvCfg:
     end_d_min, end_d_max, end_x_min, end_x_max = end_range()
-    cfg = BallPPOEnvCfg()
+    cfg = NoisePPOEnvCfg() if args_cli.noise else BallPPOEnvCfg()
     cfg.seed = int(teacher_cfg.SEED)
     cfg.episode_length_s = float(teacher_cfg.EPISODE_S)
     cfg.stop_n = int(teacher_cfg.STOP_N)
@@ -222,7 +225,8 @@ def main():
     out_dir = make_out_dir()
     write_config(out_dir)
 
-    env = make_sb3_env(make_cfg(), fast_variant=True)
+    make_env = make_noise_sb3_env if args_cli.noise else make_sb3_env
+    env = make_env(make_cfg(), fast_variant=True)
     callbacks = []
     update_save = None
     if bool(teacher_cfg.SAVE_TRAIN_TRAJ):

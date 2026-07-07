@@ -25,6 +25,7 @@ parser.add_argument("--num-episodes", type=int, default=int(cfg.NUM_EPISODES))
 parser.add_argument("--start", type=int, default=int(cfg.START))
 parser.add_argument("--stride", type=int, default=int(cfg.STRIDE))
 parser.add_argument("--random-stop", action="store_true")
+parser.add_argument("--noise", action="store_true")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -45,6 +46,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.ppo import ActorCritic
+from src.noise_env import NoisePPOEnv, NoisePPOEnvCfg
 from src.sb3_env import BallPPOEnv, BallPPOEnvCfg
 
 
@@ -116,7 +118,7 @@ def end_range() -> tuple[float, float, float, float]:
 
 def make_env() -> BallPPOEnv:
     end_d_min, end_d_max, end_x_min, end_x_max = end_range()
-    env_cfg = BallPPOEnvCfg()
+    env_cfg = NoisePPOEnvCfg() if args_cli.noise else BallPPOEnvCfg()
     env_cfg.seed = int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
     env_cfg.stop_n = int(cfg.STOP_N)
@@ -128,7 +130,8 @@ def make_env() -> BallPPOEnv:
     env_cfg.end_d_max = end_d_max
     env_cfg.end_x_min = end_x_min
     env_cfg.end_x_max = end_x_max
-    return BallPPOEnv(env_cfg)
+    env_cls = NoisePPOEnv if args_cli.noise else BallPPOEnv
+    return env_cls(env_cfg)
 
 
 def load_model(path: Path, device: torch.device, obs_dim: int) -> tuple[ActorCritic, dict]:

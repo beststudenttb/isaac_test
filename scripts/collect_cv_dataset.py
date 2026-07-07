@@ -20,6 +20,7 @@ from isaaclab.app import AppLauncher
 
 ROBOT_USD = "./assets/robots/ball_robot.usd"
 OUT_DIR = "./data_isaac"
+NOISE_OUT_DIR = "./data_isaac_noise"
 SPLITS = ("train", "test", "val")
 SPLIT_PROBS = (0.7, 0.2, 0.1)
 IMAGE_WIDTH = 224
@@ -31,6 +32,7 @@ WALL_HEIGHT = 2.0
 WALL_THICKNESS = 0.1
 ROBOT_Z = 0.5
 TARGET_RADIUS = 0.23
+NOISE_MIN_DIST = 0.5
 DIST_MIN = 2.0
 DIST_MAX = 7.0
 ANGLE_DEG = 45.0
@@ -40,9 +42,10 @@ parser = argparse.ArgumentParser(description="Collect CV dataset from Isaac tile
 parser.add_argument("--num-envs", type=int, default=64)
 parser.add_argument("--samples", type=int, default=10000)
 parser.add_argument("--spacing", type=float, default=16.0)
-parser.add_argument("--out-dir", type=Path, default=Path(OUT_DIR))
+parser.add_argument("--out-dir", type=Path, default=None)
 parser.add_argument("--seed", type=int, default=1)
 parser.add_argument("--visible-only", action="store_true")
+parser.add_argument("--noise", action="store_true")
 parser.add_argument("--render-mode", default="quality")
 parser.add_argument("--aa", default=None)
 parser.add_argument("--dlss-mode", type=int, default=None)
@@ -50,6 +53,8 @@ parser.add_argument("--graceful-close", action="store_true")
 parser.add_argument("--close-timeout", type=float, default=10.0)
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
+if args_cli.out_dir is None:
+    args_cli.out_dir = Path(NOISE_OUT_DIR if args_cli.noise else OUT_DIR)
 args_cli.enable_cameras = True
 args_cli.rendering_mode = args_cli.render_mode
 args_cli.headless = True
@@ -102,6 +107,16 @@ def add_room(env_path: str):
     wall_y.func(f"{env_path}/wall_y_neg", wall_y, translation=(0.0, -half, WALL_HEIGHT * 0.5))
 
 
+def translate_op(path: str):
+    stage = sim_utils.get_current_stage()
+    prim = stage.GetPrimAtPath(path)
+    xform = UsdGeom.Xformable(prim)
+    for op in xform.GetOrderedXformOps():
+        if op.GetOpType() == UsdGeom.XformOp.TypeTranslate:
+            return op
+    return xform.AddTranslateOp()
+
+
 def add_env(env_path: str, x: float, y: float):
     sim_utils.create_prim(env_path, "Xform", translation=(x, y, 0.0))
     add_room(env_path)
@@ -113,13 +128,16 @@ def add_env(env_path: str, x: float, y: float):
     )
     target.func(f"{env_path}/target", target, translation=(4.0, 0.0, TARGET_RADIUS))
 
-    stage = sim_utils.get_current_stage()
-    target_prim = stage.GetPrimAtPath(f"{env_path}/target")
-    target_xform = UsdGeom.Xformable(target_prim)
-    for op in target_xform.GetOrderedXformOps():
-        if op.GetOpType() == UsdGeom.XformOp.TypeTranslate:
-            return op
-    return target_xform.AddTranslateOp()
+    noise_op = None
+    if args_cli.noise:
+        noise = sim_utils.SphereCfg(
+            radius=TARGET_RADIUS,
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.1, 1.0)),
+        )
+        noise.func(f"{env_path}/noise", noise, translation=(4.0, 1.0, TARGET_RADIUS))
+        noise_op = translate_op(f"{env_path}/noise")
+
+    return translate_op(f"{env_path}/target"), noise_op
 
 
 def design_scene():
@@ -131,6 +149,7 @@ def design_scene():
     cols = int(math.ceil(math.sqrt(num_envs)))
     spacing = float(args_cli.spacing)
     target_ops = []
+    noise_ops = []
     env_origins = []
     for i in range(num_envs):
         row = i // cols
@@ -138,7 +157,10 @@ def design_scene():
         x = (col - (cols - 1) * 0.5) * spacing
         y = (row - (math.ceil(num_envs / cols) - 1) * 0.5) * spacing
         env_origins.append((x, y, 0.0))
-        target_ops.append(add_env(f"/World/envs/env_{i}", x, y))
+        target_op, noise_op = add_env(f"/World/envs/env_{i}", x, y)
+        target_ops.append(target_op)
+        if noise_op is not None:
+            noise_ops.append(noise_op)
 
     camera_cfg = TiledCameraCfg(
         prim_path="/World/envs/env_.*/Robot/head/eye/front_camera",
@@ -158,7 +180,7 @@ def design_scene():
             convention="world",
         ),
     )
-    return TiledCamera(camera_cfg), target_ops, env_origins
+    return TiledCamera(camera_cfg), target_ops, noise_ops, env_origins
 
 
 def sample_target(rng: np.random.Generator):
@@ -167,6 +189,14 @@ def sample_target(rng: np.random.Generator):
     forward = dist * math.cos(angle)
     lateral = dist * math.sin(angle)
     return forward, lateral, dist, angle
+
+
+def sample_noise(rng: np.random.Generator, target: tuple[float, float]):
+    while True:
+        forward, lateral, dist, angle = sample_target(rng)
+        gap = math.hypot(forward - target[0], lateral - target[1])
+        if gap >= NOISE_MIN_DIST:
+            return forward, lateral, dist, angle
 
 
 def quat_to_matrix(q: np.ndarray) -> np.ndarray:
@@ -250,7 +280,7 @@ def main():
         )
         sim_cfg = sim_utils.SimulationCfg(dt=0.04, device=args_cli.device, render=render_cfg)
         sim = SimulationContext(sim_cfg)
-        camera, target_ops, env_origins = design_scene()
+        camera, target_ops, noise_ops, env_origins = design_scene()
         sim.reset()
         camera.reset()
         for _ in range(5):
@@ -266,7 +296,8 @@ def main():
         print(
             f"[INFO] collect start samples={total} envs={num_envs} split_prob=train/test/val={SPLIT_PROBS} "
             f"res={IMAGE_WIDTH}x{IMAGE_HEIGHT} fov_x={FOV_X_DEG:.1f} angle=+/-{ANGLE_DEG:.1f} "
-            f"dist={DIST_MIN:.1f}-{DIST_MAX:.1f}m out={args_cli.out_dir} clear_existing=1"
+            f"dist={DIST_MIN:.1f}-{DIST_MAX:.1f}m noise={int(bool(args_cli.noise))} "
+            f"out={args_cli.out_dir} clear_existing=1"
         )
 
         while simulation_app.is_running() and saved < total:
@@ -275,6 +306,9 @@ def main():
                 forward, lateral, dist, angle = sample_target(rng)
                 op.Set(Gf.Vec3d(forward, lateral, TARGET_RADIUS))
                 batch.append((forward, lateral, dist, angle))
+            for op, target in zip(noise_ops, batch):
+                forward, lateral, _dist, _angle = sample_noise(rng, (target[0], target[1]))
+                op.Set(Gf.Vec3d(forward, lateral, TARGET_RADIUS))
 
             sim.step()
             camera.update(sim.get_physics_dt())

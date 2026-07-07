@@ -23,9 +23,26 @@
 
 - 先跑冻结 encoder + `old + xd` 的视觉 student，确认能否复现特权 student 的基本行为。
 - 对比 `xd`、`shared`、`feature` 作为 PPO state 的效果。
-- 周末批量跑 `old+xd`、`old+shared`、`MDP student`，离线评估使用 `stride=10`；下周对比 success 曲线、best update 和失败轨迹。
+- 对比 `old+shared`、MDP state、SPR state 的 success 曲线、best update 和失败轨迹。
 - 引入视觉 student 前再次确认 `student_obs` / `priv_obs` 分离方案。
 - MDP latent 接入 RL 前提醒用户决定 ResNet backbone 是否继续冻结、只解冻 `layer3`，还是全量解冻。
+- 跑当前 `train/spr_student.py`，确认 `spr_loss` 从 update 1 开始非零，并记录 std 是否继续发散。
+- 如果 std 继续变大，分别测试：std clamp、std 阈值控制 SPR 更新、固定低频 SPR 更新。
+- SPR 四阶段正式跑：阶段1 数据量从 50~100 update 起步；停止标准看 eff_rank/spr_loss 平台与 spr_bc BC 探针，不追求固定条数；多样性(加噪、随机 goal、spawn 范围)优先于条数。
+- 阶段4 表征 replay 方案（触发条件：解冻后表征退化、或远端/search 状态成功率下降，再实施）：CPU 蓄水池保留 M=10~20 个历史 rollout 的图像对（约 4~8 万帧、6~12GB 内存），阶段4 SPR minibatch 从当前 rollout 与 buffer 混采。理由：SSL 对过时数据合法；防止策略变好后数据覆盖塌缩、encoder 遗忘远端状态。阶段1 分布平稳，不需要 replay。
+- 图像级遮挡增强（cutout）实验：patch 以背景为主，球至多部分遮挡（≤1/3、低概率）；同一时间对 (t, t+k) 必须用相同 patch 位置（避免注入假运动淹没真实小位移）；保留约一半无增强样本；与 3D 场景遮挡物（任务复杂化/评估用）分开，不混为一个实验。
+- 对 `old+shared` 后期成功率下降的轨迹做统一统计：进入 stop 前是否对齐、stop 内是否动、出 stop 是由 x/y/omega 哪个动作导致。
+- 比较固定 stop 与随机 stop 的 teacher/student 差异，确认随机目标是否被策略真正利用。
+
+## rl_games / 云服务器
+
+- 限制 rl_games 训练输出，只保存必要 best/last 和关键 CSV，避免 runs 目录占满云服务器数据盘。
+- 用 `scripts/preview_rl_games.py` 对云端 checkpoint 做单 env 轨迹检查，重点看是否停在 stop 区外、是否穿墙、是否公转。
+
+## 模型归档
+
+- 每次把模型保存到 `approved_models/` 时，检查该实验是否自包含：policy、teacher、视觉预训练、MDP/SPR checkpoint、config、trajectory 是否都在说明中写清楚。
+- 清点旧 `approved_models/` 中缺失的依赖模型；能从现场文件恢复的补齐，找不到的在 readme 中明确标注不可完整复现。
 
 ## 多 agent 协作（暂停）
 
@@ -36,3 +53,4 @@
 - teacher PPO 的观测/动作/奖励定义（需读原 Webots env 对齐，尚未读取）。
 - N、M、λ、ε 的具体取值（实验调）。
 - (B) RL 梯度进 encoder 是否纳入，取决于 (A)+KL锚 的效果。
+- 判断 SPR 是否需要 IDM、k-step 或 value/reward 辅助；每次只改一个主要变量，避免无法归因。

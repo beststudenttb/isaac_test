@@ -26,6 +26,7 @@ parser.add_argument("--start", type=int, default=int(cfg.START))
 parser.add_argument("--stride", type=int, default=int(cfg.STRIDE))
 parser.add_argument("--mdp", type=Path, default=None)
 parser.add_argument("--random-stop", action="store_true")
+parser.add_argument("--noise", action="store_true")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -49,6 +50,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.cv_extractor.mdp_state import MDPStateNet
 from src.mdp_student_env import MDPStudentEnv, MDPStudentEnvCfg, make_mdp_student_env
+from src.noise_env import NoiseStudentEnvCfg, make_noise_student_env
 from src.ppo import ActorCritic
 
 
@@ -126,7 +128,7 @@ def update_num(path: Path) -> int:
 
 def make_env() -> MDPStudentEnv:
     end_d_min, end_d_max, end_x_min, end_x_max = end_range()
-    env_cfg = MDPStudentEnvCfg()
+    env_cfg = NoiseStudentEnvCfg() if args_cli.noise else MDPStudentEnvCfg()
     env_cfg.seed = int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
     env_cfg.stop_n = int(cfg.STOP_N)
@@ -145,7 +147,8 @@ def make_env() -> MDPStudentEnv:
     env_cfg.end_d_max = end_d_max
     env_cfg.end_x_min = end_x_min
     env_cfg.end_x_max = end_x_max
-    return make_mdp_student_env(env_cfg)
+    make_env_fn = make_noise_student_env if args_cli.noise else make_mdp_student_env
+    return make_env_fn(env_cfg)
 
 
 def camera_rgb(env: MDPStudentEnv) -> torch.Tensor:

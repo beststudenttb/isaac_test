@@ -25,6 +25,7 @@ parser.add_argument("--num-episodes", type=int, default=int(cfg.NUM_EPISODES))
 parser.add_argument("--start", type=int, default=int(cfg.START))
 parser.add_argument("--stride", type=int, default=int(cfg.STRIDE))
 parser.add_argument("--random-stop", action="store_true")
+parser.add_argument("--noise", action="store_true")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -44,6 +45,7 @@ from stable_baselines3 import PPO
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.noise_env import NoisePPOEnvCfg, make_noise_sb3_env
 from src.sb3_env import BallPPOEnvCfg, make_sb3_env
 from src.val_callback import TRAJ_FIELDS, make_traj_row
 
@@ -85,7 +87,7 @@ def end_range() -> tuple[float, float, float, float]:
 
 def make_env():
     end_d_min, end_d_max, end_x_min, end_x_max = end_range()
-    env_cfg = BallPPOEnvCfg()
+    env_cfg = NoisePPOEnvCfg() if args_cli.noise else BallPPOEnvCfg()
     env_cfg.seed = int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
     env_cfg.stop_n = int(cfg.STOP_N)
@@ -97,7 +99,8 @@ def make_env():
     env_cfg.end_d_max = end_d_max
     env_cfg.end_x_min = end_x_min
     env_cfg.end_x_max = end_x_max
-    return make_sb3_env(env_cfg, fast_variant=True)
+    make_env_fn = make_noise_sb3_env if args_cli.noise else make_sb3_env
+    return make_env_fn(env_cfg, fast_variant=True)
 
 
 def load_model(path: Path) -> tuple[PPO, int]:

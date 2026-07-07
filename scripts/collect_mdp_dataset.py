@@ -18,13 +18,14 @@ from isaaclab.app import AppLauncher
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = Path("./data_mdp")
+NOISE_OUT_DIR = Path("./data_mdp_noise")
 TEACHER_PATH = Path("./models/rl/teacher_ppo/best_val.zip")
 
 
 parser = argparse.ArgumentParser(description="Collect image transition dataset with teacher PPO.")
 parser.add_argument("--num-envs", type=int, default=64)
 parser.add_argument("--transitions", type=int, default=50000)
-parser.add_argument("--out-dir", type=Path, default=OUT_DIR)
+parser.add_argument("--out-dir", type=Path, default=None)
 parser.add_argument("--teacher", type=Path, default=TEACHER_PATH)
 parser.add_argument("--episode-s", type=float, default=15.0)
 parser.add_argument("--stop-n", type=int, default=3)
@@ -33,8 +34,11 @@ parser.add_argument("--render-mode", default="balanced")
 parser.add_argument("--aa", default="Off")
 parser.add_argument("--dlss-mode", type=int, default=None)
 parser.add_argument("--deterministic", action="store_true")
+parser.add_argument("--noise", action="store_true")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
+if args_cli.out_dir is None:
+    args_cli.out_dir = NOISE_OUT_DIR if args_cli.noise else OUT_DIR
 
 args_cli.headless = True
 args_cli.livestream = 0
@@ -52,6 +56,7 @@ from torchvision.io import write_png
 import isaaclab.sim as sim_utils
 
 from src.sb3_env import BallPPOEnv, BallPPOEnvCfg
+from src.noise_env import NoiseMixin, NoisePPOEnvCfg
 
 
 CSV_FIELDS = [
@@ -94,8 +99,14 @@ class DatasetBallPPOEnv(BallPPOEnv):
         return reward
 
 
+class DatasetNoisePPOEnv(NoiseMixin, DatasetBallPPOEnv):
+    def __init__(self, cfg: NoisePPOEnvCfg):
+        super().__init__(cfg)
+        self.init_noise()
+
+
 def make_env() -> DatasetBallPPOEnv:
-    cfg = BallPPOEnvCfg()
+    cfg = NoisePPOEnvCfg() if args_cli.noise else BallPPOEnvCfg()
     cfg.seed = int(args_cli.seed)
     cfg.episode_length_s = float(args_cli.episode_s)
     cfg.stop_n = int(args_cli.stop_n)
@@ -113,7 +124,8 @@ def make_env() -> DatasetBallPPOEnv:
     cfg.use_camera = True
     cfg.read_camera = True
     cfg.num_rerenders_on_reset = 1
-    return DatasetBallPPOEnv(cfg)
+    env_cls = DatasetNoisePPOEnv if args_cli.noise else DatasetBallPPOEnv
+    return env_cls(cfg)
 
 
 def rgb_images(env: BallPPOEnv) -> torch.Tensor:
@@ -188,6 +200,7 @@ def main() -> None:
                 f"aa = {args_cli.aa}",
                 f"dlss_mode = {args_cli.dlss_mode}",
                 f"deterministic = {bool(args_cli.deterministic)}",
+                f"noise = {bool(args_cli.noise)}",
             ]
         )
         + "\n",
@@ -196,7 +209,8 @@ def main() -> None:
 
     print(
         f"[INFO] collect mdp out={out_dir} envs={env.num_envs} transitions={int(args_cli.transitions)} "
-        f"teacher={args_cli.teacher} deterministic={int(bool(args_cli.deterministic))}"
+        f"teacher={args_cli.teacher} deterministic={int(bool(args_cli.deterministic))} "
+        f"noise={int(bool(args_cli.noise))}"
     )
 
     with csv_path.open("w", newline="", encoding="utf-8") as file:

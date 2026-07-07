@@ -24,6 +24,7 @@ import student_cfg
 parser = argparse.ArgumentParser(description="Train student with custom PPO.")
 parser.add_argument("--show", action="store_true")
 parser.add_argument("--random-stop", action="store_true")
+parser.add_argument("--noise", action="store_true")
 parser.add_argument("--teacher-loss", type=float, default=None)
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
@@ -48,6 +49,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.ppo import ActorCritic, Rollout, ppo_update
+from src.noise_env import NoisePPOEnv, NoisePPOEnvCfg
 from src.sb3_env import BallPPOEnv, BallPPOEnvCfg
 
 
@@ -164,6 +166,7 @@ def write_config(path: Path):
         if name.isupper():
             lines.append(f"{name} = {getattr(student_cfg, name)!r}")
     lines.append(f"RANDOM_STOP = {bool(args_cli.random_stop)!r}")
+    lines.append(f"NOISE = {bool(args_cli.noise)!r}")
     lines.append(f"TEACHER_PATH_USED = {teacher_path()!r}")
     lines.append(f"TEACHER_LOSS_USED = {teacher_loss_init()!r}")
     lines.append(f"DEVICE_USED = {args_cli.device!r}")
@@ -179,7 +182,7 @@ def open_csv(path: Path, fields: list[str]):
 
 def make_env() -> BallPPOEnv:
     end_d_min, end_d_max, end_x_min, end_x_max = end_range()
-    cfg = BallPPOEnvCfg()
+    cfg = NoisePPOEnvCfg() if args_cli.noise else BallPPOEnvCfg()
     cfg.seed = int(student_cfg.SEED)
     cfg.episode_length_s = float(student_cfg.EPISODE_S)
     cfg.stop_n = int(student_cfg.STOP_N)
@@ -191,7 +194,8 @@ def make_env() -> BallPPOEnv:
     cfg.end_d_max = end_d_max
     cfg.end_x_min = end_x_min
     cfg.end_x_max = end_x_max
-    return BallPPOEnv(cfg)
+    env_cls = NoisePPOEnv if args_cli.noise else BallPPOEnv
+    return env_cls(cfg)
 
 
 def save_model(

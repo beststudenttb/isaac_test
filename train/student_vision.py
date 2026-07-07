@@ -38,9 +38,11 @@ parser = argparse.ArgumentParser(description="Train vision student with custom P
 parser.add_argument("--show", action="store_true")
 parser.add_argument("--state", choices=["xd", "shared", "feature"], default=None)
 parser.add_argument("--cv-model", choices=["old", "old-m", "resnet", "mobile"], default=None)
+parser.add_argument("--cv-ckpt", type=Path, default=None)
 parser.add_argument("--num-envs", type=int, default=None)
 parser.add_argument("--resume", type=int, default=None)
 parser.add_argument("--random-stop", action="store_true")
+parser.add_argument("--noise", action="store_true")
 mode_group = parser.add_mutually_exclusive_group()
 mode_group.add_argument("--student", action="store_true")
 mode_group.add_argument("--teacher", action="store_true")
@@ -78,6 +80,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src import task_cfg
 from src.cv_extractor.simple_cnn import BallVisionNet, MobileBallNet, OldBallVisionNet, OldMobileBallNet
+from src.noise_env import NoisePPOEnv, NoisePPOEnvCfg
 from src.ppo import ActorCritic, Rollout, ppo_update
 from src.sb3_env import BallPPOEnv, BallPPOEnvCfg
 
@@ -100,7 +103,10 @@ def vision_choice() -> dict:
         name = str(cfg.VISION_CHOICE)
         if name not in cfg.VISION_CHOICES:
             raise KeyError(f"unknown VISION_CHOICE: {name}")
-        return cfg.VISION_CHOICES[name]
+        choice = dict(cfg.VISION_CHOICES[name])
+        if args_cli.cv_ckpt is not None:
+            choice["ckpt"] = args_cli.cv_ckpt
+        return choice
 
     if args_cli.cv_model is None or args_cli.state is None:
         raise ValueError("--cv-model and --state must be used together")
@@ -109,7 +115,10 @@ def vision_choice() -> dict:
     state = STATE_ALIAS[str(args_cli.state)]
     for choice in cfg.VISION_CHOICES.values():
         if str(choice["model"]) == model and str(choice["state"]) == state:
-            return choice
+            selected = dict(choice)
+            if args_cli.cv_ckpt is not None:
+                selected["ckpt"] = args_cli.cv_ckpt
+            return selected
     raise ValueError(f"state={args_cli.state} is not available for cv-model={args_cli.cv_model}")
 
 
@@ -231,9 +240,11 @@ def write_config(path: Path):
     lines.append(f"DEVICE_USED = {args_cli.device!r}")
     lines.append(f"CLI_STATE = {args_cli.state!r}")
     lines.append(f"CLI_CV_MODEL = {args_cli.cv_model!r}")
+    lines.append(f"CLI_CV_CKPT = {str(args_cli.cv_ckpt)!r}")
     lines.append(f"CLI_MODE = {train_mode()!r}")
     lines.append(f"VISION_CHOICE_USED = {vision_choice_name()!r}")
     lines.append(f"RANDOM_STOP = {bool(args_cli.random_stop)!r}")
+    lines.append(f"NOISE = {bool(args_cli.noise)!r}")
     lines.append(f"TEACHER_PATH_USED = {teacher_path()!r}")
     lines.append(f"RESUME = {str(args_cli.resume)!r}")
     (path / "config.py").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -286,7 +297,7 @@ def open_csv(path: Path, fields: list[str], append: bool):
 
 def make_env() -> BallPPOEnv:
     end_d_min, end_d_max, end_x_min, end_x_max = end_range()
-    env_cfg = BallPPOEnvCfg()
+    env_cfg = NoisePPOEnvCfg() if args_cli.noise else BallPPOEnvCfg()
     env_cfg.seed = int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
     env_cfg.stop_n = int(cfg.STOP_N)
@@ -305,7 +316,8 @@ def make_env() -> BallPPOEnv:
     env_cfg.end_d_max = end_d_max
     env_cfg.end_x_min = end_x_min
     env_cfg.end_x_max = end_x_max
-    return BallPPOEnv(env_cfg)
+    env_cls = NoisePPOEnv if args_cli.noise else BallPPOEnv
+    return env_cls(env_cfg)
 
 
 def load_encoder(device: torch.device) -> nn.Module:

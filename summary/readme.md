@@ -2,7 +2,7 @@
 
 本项目是视觉强化学习机器人研究项目，从原 Webots + PPO + teacher guidance + imitation learning 路线迁移到 Isaac / IsaacLab，用于测试并行仿真、相机采集和后续视觉策略训练。整体走 train-by-cheat：特权信息 teacher PPO 训练视觉 student。
 
-当前阶段：teacher PPO、自写 student PPO、视觉 student、MDP student、离线评估入口都已就绪；当前重点是周末批量跑 `old+xd`、`old+shared`、`MDP state` 三组视觉 student，并对比成功率曲线和失败轨迹。
+当前阶段：teacher PPO、自写 student PPO、视觉 student、MDP student、SPR student 和离线评估入口都已就绪；当前重点是比较人工视觉表征、MDP latent 和 SPR latent 在 PPO student 中的稳定性，重点观察 success 曲线、std、teacher loss 和失败轨迹。
 
 ## 研究方向与总体框架（核心）
 
@@ -38,7 +38,7 @@
 - `train/cv.py` 使用 `train/test/val = 7/2/1` 的语义：`train` 参与训练，`test` 用于训练过程评估和保存 best，`val` 只在 `--val` 时做最终查看。
 - `scripts/run_vision_pipeline.sh` 可顺序执行：采集 50000 张图像、训练四个 CV 模型、用 `old + xd` 接入视觉 student。
 
-## MDP 视觉表征方向（当前重点）
+## MDP / SPR 视觉表征方向（当前重点）
 
 目标是学习一个视觉 latent，使它满足：
 
@@ -47,7 +47,7 @@
 - transition contrastive：预测的下一 latent 应更接近真实下一 latent，而不是 batch 内其他候选。
 - px/dist probe：只作为诊断头，输入处 detach，不把特权几何监督反传给 encoder。
 
-当前实现状态：
+MDP 当前实现状态：
 
 1. `src/cv_extractor/mdp_state.py` 中 `MDPStateNet` 包含 image encoder、GRU belief、posterior/prior z、forward dynamics、IDM、reward/value/done/probe heads。
 2. `train/mdp_state.py` 是离线 MDP 表征预训练入口；使用归一化 latent 做 forward dyn loss，记录 `contrast`、`idm`、`retrieval1`、`eff_rank` 和 probe 诊断。
@@ -55,13 +55,32 @@
 4. `train/mdp_student.py` 当前默认使用冻结的预训练 MDP checkpoint，不在 PPO 内继续训练 MDP；后续如果恢复在线 MDP 微调，相关代码和 cfg 仍保留。
 5. 当前 contrastive 仍使用 batch 内展平负样本，可能包含同轨迹邻近帧的假负样本；先跑对照实验，后续必要时改 masked InfoNCE。
 
+SPR 当前实现状态：
+
+1. `src/cv_extractor/spr_state.py` 提供 ResNet18 + FPN + coord + conv 的 SPR encoder，含 online encoder、target encoder、transition、projector 和 predictor。
+2. `src/spr_ppo.py` 提供 SPR 视觉 state 的 PPO 组件：actor/critic、rollout、PPO update 和 k-step SPR loss。
+3. `train/spr_student.py` 是当前 SPR + PPO 主入口：保留 PPO 主信号，teacher 使用 MSE 辅助，SPR/encoder 当前配置为从训练开始更新。
+4. 近期一次 `spr_student` 训练中 `spr_loss` 全程为 0，原因是旧配置只有 `std_mean < 0.3` 才开启 SPR，而该条件从未满足；因此那次结果不能说明 SPR 本身有效或无效。
+5. `train/spr_bc.py` 是短名诊断入口，只用于 teacher MSE + SPR 的简单对照；主线仍使用 `train/spr_student.py`。
+
 ## RL 当前实验状态
 
 - `src/sb3_env.py` 已把 teacher / student 的特权观测改为 `[px, dist, end_d, end_x]`，并在 reset 时由 env 统一采样 stop 目标；reward、stop 区域和 success 判断使用同一份 end state。
 - approach 阶段的状态改善 reward 已改为固定尺度：`px` 改善除以 `IMAGE_WIDTH=224`，`dist` 改善除以 `DIST_MAX - FAIL_NEAR = 6`，`K_X/K_D` 后续手动调。
 - 视觉 student 和 MDP student 的策略输入都显式拼接 `end_obs`，避免随机 stop 目标时策略不知道任务目标。
 - teacher `update_88` 离线评估约 `506/512` 成功，失败样本全部是 timeout，主要原因是初始目标在相机右侧视野外且距离远，search 阶段转头较慢。
-- 周末批量脚本 `scripts/run_weekend_students.sh` 会顺序训练并评估：`old+xd`、`old+shared`、`MDP student`；离线 val 默认 `stride=10`。
+- 当前正在比较 `old+shared`、MDP state、SPR state 等视觉 student；离线 val 仍主要看 success 曲线、best update 和失败轨迹。
+- teacher MSE 只监督 actor mean，不会直接约束 `log_std`；若 std 发散，需要单独处理 std 或使用 NLL 作为诊断实验。
+- rl_games PPO 环境包已能在云端训练和本地 preview；云端 runs/checkpoint 容易占用大量磁盘，后续只保留必要 best/last 和关键 CSV。
+- 近期 SPR student 的一次训练中 SPR 实际未激活，std 发散主要来自 PPO 采样、action clamp 和稀疏成功信号；当前已改为从训练开始启用 SPR。
+
+## 近期实验结论
+
+- teacher 可以加速视觉 student 早期形成策略，但 teacher MSE 不能约束 std，也不能保证后期 PPO 不偏离。
+- `old+shared`、MDP state 和 SPR state 的差异需要看 deterministic offline val 与失败轨迹，不能只看训练 rollout 的 success。
+- stop 区域 reward 仍是关键不稳定来源：密集 stop 奖励可能诱导刷分或边缘行为，纯 success 信号又过于稀疏。
+- 随机 stop 任务已经具备基本代码路径；后续重点是检查任务目标进入 state 后是否真的被策略利用。
+- 自监督表征要想超过人工 px/dist，需要更复杂或更难人工表征的任务，否则简单 docking 上人工几何特征天然占优。
 
 当前目录约定：
 
@@ -72,6 +91,7 @@
 - `val/` 放离线评估入口。
 - `models/` 放训练现场输出，不上传 Git。
 - `approved_models/` 放确认保留的模型和说明，需要上传 Git。
+- `approved_models/` 中每个确认实验应尽量自包含：policy、teacher、视觉预训练、MDP/SPR checkpoint、配置和 trajectory 都要能复现。
 - `summary/` 放规则、项目状态、TODO 和每日总结。
 - `data_isaac/` 放本地生成数据，不上传 Git。
 
@@ -98,7 +118,7 @@
 
 ## 联合训练方案（阶段二，后续方向）
 
-最终目标：中间特征（`reserve_feature`）当 RL 的 state，且持续参与训练让表征随任务演化；难点是防止"状态漂移"导致已训策略失效。关键判断：
+最终目标：视觉 latent 当 RL 的 state，且持续参与训练让表征随任务演化；难点是防止"状态漂移"导致已训策略失效。关键判断：
 
 1. **M 轮视觉更新以特权监督 loss 为主，RL 梯度进 encoder 最多作小附加项 / 后续消融。**
    - (A) 特权监督：继续训 x/dist，标签由 Isaac 每步近免费提供（正是 teacher 的特权信息），特征锚在几何意义上，漂移有界且良性。

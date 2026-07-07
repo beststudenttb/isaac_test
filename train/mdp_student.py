@@ -25,6 +25,7 @@ parser = argparse.ArgumentParser(description="Train PPO student on MDP latent st
 parser.add_argument("--num-envs", type=int, default=None)
 parser.add_argument("--mdp", type=Path, default=None)
 parser.add_argument("--random-stop", action="store_true")
+parser.add_argument("--noise", action="store_true")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -50,6 +51,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.cv_extractor.mdp_state import MDPStateNet
 from src.mdp_student_env import MDPStudentEnv, MDPStudentEnvCfg, make_mdp_student_env
+from src.noise_env import NoiseStudentEnvCfg, make_noise_student_env
 from src.ppo import ActorCritic, Rollout, ppo_update
 from src import task_cfg
 
@@ -175,6 +177,7 @@ def write_config(path: Path, mdp_path: Path, obs_dim: int):
     lines.append(f"MDP_PATH_USED = {mdp_path!r}")
     lines.append(f"OBS_DIM = {int(obs_dim)!r}")
     lines.append(f"RANDOM_STOP = {bool(args_cli.random_stop)!r}")
+    lines.append(f"NOISE = {bool(args_cli.noise)!r}")
     lines.append(f"TEACHER_PATH_USED = {teacher_path()!r}")
     lines.append(f"DEVICE_USED = {args_cli.device!r}")
     (path / "config.py").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -189,7 +192,7 @@ def open_csv(path: Path, fields: list[str]):
 
 def make_env():
     end_d_min, end_d_max, end_x_min, end_x_max = end_range()
-    env_cfg = MDPStudentEnvCfg()
+    env_cfg = NoiseStudentEnvCfg() if args_cli.noise else MDPStudentEnvCfg()
     env_cfg.seed = int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
     env_cfg.stop_n = int(cfg.STOP_N)
@@ -208,7 +211,8 @@ def make_env():
     env_cfg.end_d_max = end_d_max
     env_cfg.end_x_min = end_x_min
     env_cfg.end_x_max = end_x_max
-    return make_mdp_student_env(env_cfg)
+    make_env_fn = make_noise_student_env if args_cli.noise else make_mdp_student_env
+    return make_env_fn(env_cfg)
 
 
 def load_mdp(device: torch.device) -> MDPStateNet:

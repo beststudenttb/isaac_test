@@ -7,7 +7,7 @@ OUT_DIR = Path("./models/rl/student_ppo")  # student PPO 输出目录。
 RANDOM_STOP_OUT_DIR = Path("./models/rl/student_ppo_random_stop")  # --random-stop 时的输出目录。
 CLEAR_OUT_DIR = True  # 每次训练前清空 OUT_DIR。
 
-NUM_ENVS = 32  # 并行环境数量。
+NUM_ENVS = 512  # 并行环境数量。
 TOTAL_STEPS = 8_192_000  # 总采样步数，按 SB3 total_timesteps 语义。
 EPISODE_S = 15.0  # 单个 episode 最长仿真时间，单位秒。
 STOP_N = 1  # 训练时只要在 stop 区输出一次 stop 就 success done。
