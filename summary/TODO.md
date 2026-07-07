@@ -5,6 +5,7 @@
 - 确认手动修改后的 `assets/robots/ball_robot.usd` 中 eye 俯仰角、相机挂载结构和碰撞设置是否符合后续训练需求。
 - 继续用肉眼抽查数据集图片质量，并确认 `px_x`、`dist` 标签和真实图像读取结果之间的误差范围。
 - 用 `balanced + DLSS performance` 重新采集数据后，确认 CV 训练和视觉 student 推理时的图像分布一致。
+- 抽查 `data_isaac_noise/` 中蓝球干扰样本，确认红球标签不被蓝球遮挡或过近干扰；重点看 `old+xd` 和 `old+shared` 是否会把蓝球误当目标。
 
 ## 阶段一：视觉预训练
 
@@ -24,6 +25,7 @@
 - 先跑冻结 encoder + `old + xd` 的视觉 student，确认能否复现特权 student 的基本行为。
 - 对比 `xd`、`shared`、`feature` 作为 PPO state 的效果。
 - 对比 `old+shared`、MDP state、SPR state 的 success 曲线、best update 和失败轨迹。
+- 对比干净环境与带干扰环境下的 `old+xd`、`old+shared`，判断人工几何输出和 shared feature 在干扰球存在时的鲁棒性差异。
 - 引入视觉 student 前再次确认 `student_obs` / `priv_obs` 分离方案。
 - MDP latent 接入 RL 前提醒用户决定 ResNet backbone 是否继续冻结、只解冻 `layer3`，还是全量解冻。
 - 跑当前 `train/spr_student.py`，确认 `spr_loss` 从 update 1 开始非零，并记录 std 是否继续发散。
@@ -43,6 +45,7 @@
 
 - 每次把模型保存到 `approved_models/` 时，检查该实验是否自包含：policy、teacher、视觉预训练、MDP/SPR checkpoint、config、trajectory 是否都在说明中写清楚。
 - 清点旧 `approved_models/` 中缺失的依赖模型；能从现场文件恢复的补齐，找不到的在 readme 中明确标注不可完整复现。
+- 新的带干扰视觉实验如果保存到 `approved_models/`，必须同时保存 noisy CV checkpoint、student policy、teacher 依赖、配置和关键 val/train 轨迹。
 
 ## 多 agent 协作（暂停）
 

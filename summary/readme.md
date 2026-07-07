@@ -2,7 +2,7 @@
 
 本项目是视觉强化学习机器人研究项目，从原 Webots + PPO + teacher guidance + imitation learning 路线迁移到 Isaac / IsaacLab，用于测试并行仿真、相机采集和后续视觉策略训练。整体走 train-by-cheat：特权信息 teacher PPO 训练视觉 student。
 
-当前阶段：teacher PPO、自写 student PPO、视觉 student、MDP student、SPR student 和离线评估入口都已就绪；当前重点是比较人工视觉表征、MDP latent 和 SPR latent 在 PPO student 中的稳定性，重点观察 success 曲线、std、teacher loss 和失败轨迹。
+当前阶段：teacher PPO、自写 student PPO、视觉 student、MDP student、SPR student 和离线评估入口都已就绪；当前重点是比较人工视觉表征、MDP latent、SPR latent 和随机/弱表征 baseline 在 PPO student 中的稳定性，并通过带干扰视觉环境检验表征是否真正关注目标。
 
 ## 研究方向与总体框架（核心）
 
@@ -37,6 +37,7 @@
 - 视觉训练当前临时使用 `balanced + DLSS performance(dlss_mode=0)`；采集脚本支持用参数指定渲染模式和抗锯齿模式。
 - `train/cv.py` 使用 `train/test/val = 7/2/1` 的语义：`train` 参与训练，`test` 用于训练过程评估和保存 best，`val` 只在 `--val` 时做最终查看。
 - `scripts/run_vision_pipeline.sh` 可顺序执行：采集 50000 张图像、训练四个 CV 模型、用 `old + xd` 接入视觉 student。
+- 当前新增带干扰环境：红球仍是目标，蓝球只作为视觉干扰。数据采集和训练入口通过 `--noise` 显式启用，默认仍使用干净环境。带干扰 CV 数据默认输出到 `./data_isaac_noise/`，CV checkpoint 默认保存到 `./models/vision/cv_old_noise/`。
 
 ## MDP / SPR 视觉表征方向（当前重点）
 
@@ -78,6 +79,7 @@ SPR 当前实现状态：
 
 - teacher 可以加速视觉 student 早期形成策略，但 teacher MSE 不能约束 std，也不能保证后期 PPO 不偏离。
 - `old+shared`、MDP state 和 SPR state 的差异需要看 deterministic offline val 与失败轨迹，不能只看训练 rollout 的 success。
+- 简单 CNN / 随机冻结表征对照显示，强 teacher BC + 低 std 本身就能驱动策略形成，因此后续需要用带干扰或更复杂任务来区分“表征真的好”与“teacher 拉着能学”的差异。
 - stop 区域 reward 仍是关键不稳定来源：密集 stop 奖励可能诱导刷分或边缘行为，纯 success 信号又过于稀疏。
 - 随机 stop 任务已经具备基本代码路径；后续重点是检查任务目标进入 state 后是否真的被策略利用。
 - 自监督表征要想超过人工 px/dist，需要更复杂或更难人工表征的任务，否则简单 docking 上人工几何特征天然占优。
@@ -92,6 +94,7 @@ SPR 当前实现状态：
 - `models/` 放训练现场输出，不上传 Git。
 - `approved_models/` 放确认保留的模型和说明，需要上传 Git。
 - `approved_models/` 中每个确认实验应尽量自包含：policy、teacher、视觉预训练、MDP/SPR checkpoint、配置和 trajectory 都要能复现。
+- 最新确认归档：`approved_models/2026_07_05_spr_student/`，包含 SPR student 的 policy、SPR checkpoint、teacher、配置和关键轨迹。
 - `summary/` 放规则、项目状态、TODO 和每日总结。
 - `data_isaac/` 放本地生成数据，不上传 Git。
 
