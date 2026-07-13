@@ -39,6 +39,10 @@ approved_models/
 | `2026_06_27_weekend_students/old_shared_student` | 视觉 student | 518 | `deps/cv_old/best.pt` + `deps/teacher_ppo/best_val.zip` |
 | `2026_06_27_weekend_students/mdp_student` | MDP student | 162 | `deps/mdp_state_priv_probe_grad/last.pt` + `deps/teacher_ppo/best_val.zip` |
 | `2026_06_29_cv_old` | 视觉预训练 | - | 只保存 `cv_old`，不是 RL policy |
+| `2026_07_08_mdp_student_noise` | MDP student | 162 | `deps/mdp_state_priv_probe_grad/last.pt` + `deps/teacher_ppo/best_val.zip`，4 维 goal teacher；noise env |
+| `2026_07_10_mdp_student_anneal` | MDP student | 162 | 同上；teacher 退火（250 保持 / 150 线性退到 0）|
+| `2026_07_10_spr_student_center` | SPR student | 130 | `stage1_end.pt` + `teacher_best_val.zip`；`spr_loss_k` 去中心化；noise env |
+| `2026_07_13_spr_student_bc1` | SPR student | 130 | 同上；`TEACHER_LOSS=1`（反证实验，成绩差，保留是为了结论）|
 
 说明：
 
@@ -47,3 +51,8 @@ approved_models/
 - `516 -> 518`、`160 -> 162` 是因为后续视觉/MDP student 把 `end_d, end_x` 拼进了策略输入。
 - 旧包里如果 readme 标注“精确文件现场已找不到”，只能保证保留了同代可用依赖，不能保证 teacher checkpoint 和原训练时逐字节一致。
 - 本目录保存模型依赖和配置快照；如果 reward/env 源码之后继续变化，复现历史实验时需要结合当时 commit 或 readme 说明判断。
+- `mdp_state_priv_probe_grad` 在 `2026_06_27_weekend_students` 与 `2026_07_08_mdp_student_noise` / `2026_07_10_mdp_student_anneal` 中是**两个不同的 checkpoint**（前者 md5 `1e63006c...`，后两者 `1a177e1d...`），各自目录里的副本才是该实验真正使用的那份，不可互换。
+- `2026_07_08_mdp_student_noise` 与 `2026_07_10_mdp_student_anneal` 是同 seed、同 encoder、同 env 的一组对照，唯一变量是 teacher 退火；前 250 个 update 的日志几乎逐行重合。
+- SPR student 的 `best_offline.pt` 是 `ppo_*` 类型，**只含策略**，必须配同目录 `stage1_end.pt` 的 SPR/encoder 使用；MDP student 的 `best_offline.pt` 则配 `deps/` 下的 encoder。
+- `2026_07_10_spr_student_center` 与 `2026_07_13_spr_student_bc1` 的 `stage1_end.pt` **不是同一份**（`e9464932...` vs `ef6d8647...`），两次 stage1 各自重训过；对比时注意 encoder 不是单变量。
+- `2026_07_13_spr_student_bc1` 与 `2026_07_10_mdp_student_anneal` 的 `TEACHER_LOSS` 都是 1.0，是目前 SPR/MDP 两条线在 BC 权重上唯一对齐的一组：BC-only 段两者离线成绩都是 ~0%，PPO 接手后 MDP 涨到 96%、SPR 塌到 0%。

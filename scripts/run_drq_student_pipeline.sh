@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -e
+
+cd "$(dirname "$0")/.."
+
+STUDENT_ENVS="${STUDENT_ENVS:-32}"
+VAL_ENVS="${VAL_ENVS:-32}"
+VAL_EPISODES="${VAL_EPISODES:-1}"
+VAL_START="${VAL_START:-0}"
+VAL_STRIDE="${VAL_STRIDE:-1}"
+OBS_MODE="${OBS_MODE:-spr_z}"
+RANDOM_STOP="${RANDOM_STOP:-0}"
+NOISE="${NOISE:-1}"
+# Physical GPU for this pipeline. Isaac Sim's usdrt scenegraph only supports
+# cuda:0, so we hide other GPUs via CUDA_VISIBLE_DEVICES instead of --device cuda:N.
+# Default GPU 0: GPU 1 is usually occupied by the on-policy SPR line.
+GPU="${GPU:-0}"
+export CUDA_VISIBLE_DEVICES="${GPU}"
+DEVICE="${DEVICE:-cuda:0}"
+
+ARGS=(--obs-mode "${OBS_MODE}")
+if [ "${RANDOM_STOP}" = "1" ]; then
+  ARGS+=(--random-stop)
+fi
+if [ "${NOISE}" = "1" ]; then
+  ARGS+=(--noise)
+fi
+if [ -n "${DEVICE}" ]; then
+  ARGS+=(--device "${DEVICE}")
+fi
+
+# Unsetting DISPLAY makes Kit fall back to pure off-screen rendering, which
+# also works on a GPU without a monitor attached (see run_spr_student_pipeline.sh).
+env -u DISPLAY ./IsaacLab/isaaclab.sh -p train/drq_student.py \
+  --num-envs "${STUDENT_ENVS}" \
+  "${ARGS[@]}"
+
+env -u DISPLAY ./IsaacLab/isaaclab.sh -p val/drq_student.py \
+  --num-envs "${VAL_ENVS}" \
+  --num-episodes "${VAL_EPISODES}" \
+  --start "${VAL_START}" \
+  --stride "${VAL_STRIDE}" \
+  "${ARGS[@]}"

@@ -134,7 +134,6 @@ SPR_LOG_FIELDS = [
     "pred_cos",
     "identity_gap",
     "target_sim",
-    "q_corr",
 ]
 
 VAL_FIELDS = [
@@ -627,7 +626,6 @@ def main() -> None:
             update_spr = False
             if stage == 1:
                 update_spr = True
-                q_coef_now = float(cfg.Q_COEF) * min(1.0, update / max(int(cfg.Q_WARMUP_UPDATES), 1))
                 loss = spr_only_update(
                     model=model,
                     opt=opt,
@@ -636,8 +634,6 @@ def main() -> None:
                     epochs=int(cfg.N_EPOCHS),
                     spr_coef=float(cfg.SPR_COEF),
                     max_grad_norm=float(cfg.MAX_GRAD_NORM),
-                    q_coef=q_coef_now,
-                    return_scale=float(cfg.RETURN_SCALE),
                 )
             else:
                 update_spr = stage == 4 and int(cfg.SPR_UPDATE_EVERY) > 0 and update % int(cfg.SPR_UPDATE_EVERY) == 0

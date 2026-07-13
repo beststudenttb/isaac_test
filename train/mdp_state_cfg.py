@@ -3,7 +3,7 @@
 from pathlib import Path
 
 
-DATASET_DIR = Path("./data_mdp_teacher_50k")  # 离线 MDP 数据集目录。
+DATASET_DIR = Path("./data_mdp_teacher_50k_noise")  # 离线 MDP 数据集目录。
 OUT_DIR = Path("./models/vision/mdp_state_priv_probe_grad")  # MDP state 模型输出目录。
 DEVICE = "auto"  # 训练设备，auto/cpu/cuda。
 

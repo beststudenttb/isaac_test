@@ -36,7 +36,6 @@ class SPRActorCritic(nn.Module):
         obs_dim = int(spr.z_dim) + self.goal_dim
         self.actor = mlp(obs_dim, pi_hidden, self.act_dim, activation)
         self.critic = mlp(obs_dim, vf_hidden, 1, activation)
-        self.q_head = mlp(obs_dim + self.act_dim, vf_hidden, 1, activation)
         self.log_std = nn.Parameter(torch.full((self.act_dim,), torch.log(torch.tensor(float(init_std)))))
 
     def encode(self, image: torch.Tensor, grad: bool = True) -> torch.Tensor:
@@ -55,11 +54,6 @@ class SPRActorCritic(nn.Module):
 
     def critic_obs(self, z: torch.Tensor, goal: torch.Tensor) -> torch.Tensor:
         return torch.cat((z, goal.to(device=z.device, dtype=z.dtype)), dim=1)
-
-    def q_value(self, z: torch.Tensor, goal: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-        obs = self.critic_obs(z, goal)
-        action = action.to(device=z.device, dtype=z.dtype)
-        return self.q_head(torch.cat((obs, action), dim=1)).squeeze(-1)
 
     def dist_from_z(self, z: torch.Tensor, goal: torch.Tensor, z_grad_scale: float = 0.0) -> Normal:
         mean = self.actor(self.actor_obs(z, goal, z_grad_scale=z_grad_scale))
@@ -113,6 +107,10 @@ class SPRActorCritic(nn.Module):
         for i in range(actions.shape[1]):
             pred_z = self.spr.predict_next(pred_z, actions[:, i])
         pred = self.spr.spr_pred(pred_z)
+        # normalize() removes scale but not a shared mean, so a constant offset can
+        # drive the cosine to 1 without predicting anything. Center over the batch first.
+        pred = pred - pred.mean(dim=0, keepdim=True)
+        target = target - target.mean(dim=0, keepdim=True)
         return F.mse_loss(F.normalize(pred, dim=1), F.normalize(target, dim=1))
 
 
@@ -250,7 +248,7 @@ def encode_chunks(fn, images: torch.Tensor, chunk: int = 32) -> torch.Tensor:
 def spr_diagnostics(model: SPRActorCritic, batch: SPRBatch, sample: int = 256, chunk: int = 32) -> dict[str, float]:
     valid = torch.nonzero(batch.spr_mask, as_tuple=False).squeeze(-1)
     if valid.numel() == 0:
-        return {"eff_rank": 0.0, "z_std": 0.0, "pred_cos": 0.0, "identity_gap": 0.0, "target_sim": 0.0, "q_corr": 0.0}
+        return {"eff_rank": 0.0, "z_std": 0.0, "pred_cos": 0.0, "identity_gap": 0.0, "target_sim": 0.0}
     idx = valid[: int(sample)]
     idx_cpu = idx.cpu()
     with torch.no_grad():
@@ -260,31 +258,28 @@ def spr_diagnostics(model: SPRActorCritic, batch: SPRBatch, sample: int = 256, c
         p = s / s.sum().clamp_min(1e-8)
         eff_rank = float(torch.exp(-(p * (p + 1e-12).log()).sum()).cpu())
         z_std = float(z.std(dim=0).mean().cpu())
+        # Measure the same centered quantities spr_loss_k optimizes; uncentered cosines
+        # sit at ~0.9999 regardless of what the encoder learned.
+        center = lambda x: x - x.mean(dim=0, keepdim=True)
         target_z = encode_chunks(model.spr.encode_target, batch.spr_target_images[idx_cpu], chunk)
-        target = F.normalize(model.spr.spr_target(target_z), dim=1)
+        target = F.normalize(center(model.spr.spr_target(target_z)), dim=1)
         pred_z = z
         acts = batch.spr_actions[idx]
         for i in range(acts.shape[1]):
             pred_z = model.spr.predict_next(pred_z, acts[:, i])
-        pred = F.normalize(model.spr.spr_pred(pred_z), dim=1)
-        ident = F.normalize(model.spr.spr_pred(z), dim=1)
+        pred = F.normalize(center(model.spr.spr_pred(pred_z)), dim=1)
+        ident = F.normalize(center(model.spr.spr_pred(z)), dim=1)
         cur_target_z = encode_chunks(model.spr.encode_target, batch.images[idx_cpu], chunk)
-        cur_target = F.normalize(model.spr.spr_target(cur_target_z), dim=1)
+        cur_target = F.normalize(center(model.spr.spr_target(cur_target_z)), dim=1)
         pred_cos = float((pred * target).sum(dim=1).mean().cpu())
         ident_cos = float((ident * target).sum(dim=1).mean().cpu())
         target_sim = float((cur_target * target).sum(dim=1).mean().cpu())
-        q_pred = model.q_value(z, batch.goals[idx], batch.actions[idx])
-        rank_q = q_pred.argsort().argsort().float()
-        rank_r = batch.returns[idx].argsort().argsort().float()
-        corr = torch.corrcoef(torch.stack((rank_q, rank_r)))[0, 1]
-        q_corr = float(torch.nan_to_num(corr).cpu())
     return {
         "eff_rank": eff_rank,
         "z_std": z_std,
         "pred_cos": pred_cos,
         "identity_gap": pred_cos - ident_cos,
         "target_sim": target_sim,
-        "q_corr": q_corr,
     }
 
 
@@ -296,12 +291,9 @@ def spr_only_update(
     epochs: int,
     spr_coef: float,
     max_grad_norm: float,
-    q_coef: float = 0.0,
-    return_scale: float = 1.0,
 ) -> dict[str, float]:
     n = batch.actions.shape[0]
     total_spr = 0.0
-    total_q = 0.0
     total_gn = 0.0
     updates = 0
     device = batch.actions.device
@@ -311,23 +303,16 @@ def spr_only_update(
             idx = ids[start : start + int(batch_size)]
             idx_cpu = idx.cpu()
             valid = batch.spr_mask[idx]
-            if not torch.any(valid) and q_coef <= 0.0:
+            if not torch.any(valid):
                 continue
             z = model.encode(batch.images[idx_cpu], grad=True)
-            spr_loss = torch.zeros((), device=device)
-            if torch.any(valid):
-                spr_loss = model.spr_loss_k(z[valid], batch.spr_target_images[idx_cpu][valid.cpu()], batch.spr_actions[idx][valid])
-            q_loss = torch.zeros((), device=device)
-            if q_coef > 0.0:
-                q_pred = model.q_value(z, batch.goals[idx], batch.actions[idx])
-                q_loss = 0.5 * (q_pred - batch.returns[idx] / return_scale).pow(2).mean()
+            spr_loss = model.spr_loss_k(z[valid], batch.spr_target_images[idx_cpu][valid.cpu()], batch.spr_actions[idx][valid])
             opt.zero_grad()
-            (spr_coef * spr_loss + q_coef * q_loss).backward()
+            (spr_coef * spr_loss).backward()
             grad_norm = nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
             opt.step()
             model.spr.update_target()
             total_spr += float(spr_loss.detach().cpu())
-            total_q += float(q_loss.detach().cpu())
             total_gn += float(grad_norm.cpu())
             updates += 1
     with torch.no_grad():
@@ -336,7 +321,6 @@ def spr_only_update(
         "pi_loss": 0.0,
         "v_loss": 0.0,
         "spr_loss": total_spr / max(updates, 1),
-        "q_loss": total_q / max(updates, 1),
         "entropy": 0.0,
         "kl": 0.0,
         "clip_frac": 0.0,

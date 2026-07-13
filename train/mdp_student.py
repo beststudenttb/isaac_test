@@ -252,6 +252,14 @@ def mdp_observe(
     }
 
 
+def teacher_coef_for_step(step: int) -> float:
+    hold = int(cfg.TEACHER_HOLD_STEPS)
+    if step < hold:
+        return float(cfg.TEACHER_LOSS)
+    frac = (step - hold) / max(int(cfg.TEACHER_ANNEAL_STEPS), 1)
+    return max(float(cfg.TEACHER_LOSS) * max(1.0 - frac, 0.0), float(cfg.TEACHER_LOSS_MIN))
+
+
 def load_teacher(device: torch.device):
     if (
         float(cfg.TEACHER_LOSS) <= 0.0
@@ -674,7 +682,7 @@ def main():
     ).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=float(cfg.LR), eps=1e-5)
     mdp_opt = torch.optim.Adam((param for param in mdp.parameters() if param.requires_grad), lr=float(cfg.MDP_LR), eps=1e-5)
-    teacher_coef = float(cfg.TEACHER_LOSS)
+    teacher_coef = teacher_coef_for_step(0)
     teacher_min = float(cfg.TEACHER_LOSS_MIN)
     teacher_down_mdp = float(cfg.TEACHER_DOWN_MDP)
     teacher_down_success = float(cfg.TEACHER_DOWN_SUCCESS)
@@ -700,6 +708,7 @@ def main():
     best = -1.0
     try:
         for update in range(1, updates + 1):
+            teacher_coef = teacher_coef_for_step((update - 1) * steps_per_update)
             train_mdp_now = bool(cfg.TRAIN_MDP) and update > int(cfg.MDP_WARMUP) and update % int(cfg.MDP_EVERY) == 0
             rollout = Rollout(
                 steps=int(cfg.N_STEPS),

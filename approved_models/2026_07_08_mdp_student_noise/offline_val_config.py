@@ -1,0 +1,12 @@
+run_name = 'mdp_student'
+num_envs = 128
+num_episodes = 1
+start = 0
+stride = 1
+random_stop = False
+episodes_per_checkpoint = 128
+val_steps = 0
+episode_s = 15.0
+stop_n = 3
+seed = 0
+device = 'cuda:0'

@@ -3,8 +3,8 @@
 from pathlib import Path
 
 
-OUT_DIR = Path("./models/rl/spr_student_q")  # SPR + Q student 输出目录(与 train 对齐)。
-RANDOM_STOP_OUT_DIR = Path("./models/rl/spr_student_q_random_stop")  # --random-stop 时的输出目录。
+OUT_DIR = Path("./models/rl/spr_student")  # SPR student 输出目录(与 train 对齐)。
+RANDOM_STOP_OUT_DIR = Path("./models/rl/spr_student_random_stop")  # --random-stop 时的输出目录。
 SPR_CKPT = "stage1_end.pt"  # ppo_*.pt 配对的 SPR 来源(阶段1最后一档,固定规则);full_*.pt 自带 SPR。
 
 NUM_ENVS = 32  # 离线 val 默认并行环境数量;64 会在 val 启动时内存崩溃。
