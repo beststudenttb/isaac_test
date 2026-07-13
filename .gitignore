@@ -3,8 +3,10 @@ __pycache__/
 
 IsaacLab/
 data_isaac/
+data_isaac_noise/
 data_mdp*/
 models/
+runs/
 camera_sweep_runs/
 camera_sweep*.mp4
 
@@ -20,3 +22,8 @@ chat/
 *.jpg
 *.png
 *.txt
+
+random_*.zip
+rl_games_ball/*.pth
+cv_xd_compare.csv
+old_cv_features.csv
