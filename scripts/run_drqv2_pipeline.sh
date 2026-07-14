@@ -10,6 +10,7 @@ VAL_START="${VAL_START:-0}"
 VAL_STRIDE="${VAL_STRIDE:-1}"
 RANDOM_STOP="${RANDOM_STOP:-0}"
 NOISE="${NOISE:-1}"  # 与 SPR/MDP 线一致,默认跑 NoiseStudentEnv;NOISE=0 是干净 env(不可与那两条线横比)。
+SEED="${SEED:-}"          # 空 = 用 cfg 里的 SEED(1);设别的值会写到 _seed{N} 目录
 GPU="${GPU:-0}"
 DEVICE="${DEVICE:-cuda:0}"
 
@@ -24,6 +25,9 @@ if [ "${NOISE}" = "1" ]; then
 fi
 if [ -n "${DEVICE}" ]; then
   ARGS+=(--device "${DEVICE}")
+fi
+if [ -n "${SEED}" ]; then
+  ARGS+=(--seed "${SEED}")
 fi
 
 env -u DISPLAY ./IsaacLab/isaaclab.sh -p train/drqv2.py \

@@ -22,6 +22,7 @@ import drqv2_cfg as cfg
 
 parser = argparse.ArgumentParser(description="Train DrQ-v2 from stacked RGB.")
 parser.add_argument("--num-envs", type=int, default=None)
+parser.add_argument("--seed", type=int, default=None)
 parser.add_argument("--random-stop", action="store_true")
 parser.add_argument("--noise", action="store_true")
 parser.add_argument("--show", action="store_true")
@@ -90,12 +91,19 @@ TRAJ_FIELDS = [
 ]
 
 
+def run_seed() -> int:
+    return int(args_cli.seed) if args_cli.seed is not None else int(cfg.SEED)
+
+
 def output_dir() -> Path:
     path = Path(cfg.OUT_DIR)
     if args_cli.random_stop:
         path = path.with_name(path.name + str(cfg.RANDOM_STOP_SUFFIX))
     if args_cli.noise:
         path = path.with_name(path.name + str(cfg.NOISE_SUFFIX))
+    if run_seed() != int(cfg.SEED):
+        # 多 seed 必须各写各的目录,否则 CLEAR_OUT_DIR 会让它们互相吃掉。
+        path = path.with_name(f"{path.name}_seed{run_seed()}")
     if bool(cfg.CLEAR_OUT_DIR) and path.exists():
         shutil.rmtree(path)
     path.mkdir(parents=True, exist_ok=True)
@@ -121,7 +129,7 @@ def end_range() -> tuple[float, float, float, float]:
 def make_env() -> MDPStudentEnv:
     end_d_min, end_d_max, end_x_min, end_x_max = end_range()
     env_cfg = NoiseStudentEnvCfg() if args_cli.noise else MDPStudentEnvCfg()
-    env_cfg.seed = int(cfg.SEED)
+    env_cfg.seed = run_seed()
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
     env_cfg.stop_n = int(cfg.STOP_N)
     env_cfg.scene.num_envs = (
@@ -182,6 +190,7 @@ def write_config(path: Path, env: MDPStudentEnv, obs_shape: tuple[int, int, int]
             f"OBS_SHAPE = {obs_shape!r}",
             f"RANDOM_STOP = {bool(args_cli.random_stop)!r}",
             f"NOISE = {bool(args_cli.noise)!r}",
+            f"SEED_USED = {run_seed()!r}",
         )
     )
     (path / "config.py").write_text(
@@ -215,7 +224,7 @@ def open_csv(path: Path, fields: list[str]):
 
 
 def main() -> None:
-    seed = int(cfg.SEED)
+    seed = run_seed()
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -239,6 +248,10 @@ def main() -> None:
     )
     obs_shape = frame_stacker.obs_shape
     agent_cfg = agent_config(obs_shape)
+    # 重新播种:NoiseStudentEnv 的 sample_noise() 是拒绝采样,每次 reset 消耗**不定数量**的随机数,
+    # 而它在 make_env() 里就跑过了。不重播的话,--noise 和不带 --noise 的 agent 初始权重不一样,
+    # "干净 vs noise" 就不是单变量对照(07-14 踩过:两次都是 SEED=1,实际却是不同的 seed)。
+    torch.manual_seed(seed)
     agent = DrQV2Agent(**agent_cfg, device=device)
     replay = VectorNStepReplay(
         capacity_per_env=int(cfg.CAPACITY_PER_ENV),
@@ -388,9 +401,12 @@ def main() -> None:
                     "collect_s": f"{window_collect_s:.3f}",
                     "learn_s": f"{window_learn_s:.3f}",
                     "episodes": window_episodes,
-                    "success_rate": f"{window_success / max(window_episodes, 1):.4f}",
-                    "fail_rate": f"{window_fail / max(window_episodes, 1):.4f}",
-                    "timeout_rate": f"{window_timeout / max(window_episodes, 1):.4f}",
+                    # 窗口内没有 episode 结束时留空,而不是写 0.0000 —— 否则"没数据"和"真的 0%"
+                    # 在日志里长得一样(平均每窗口只有 ~2 个 episode,一半的窗口是空的)。
+                    # 聚合时一律按 episodes 列加权,见 scripts/analyze_runs.py。
+                    "success_rate": f"{window_success / window_episodes:.4f}" if window_episodes else "",
+                    "fail_rate": f"{window_fail / window_episodes:.4f}" if window_episodes else "",
+                    "timeout_rate": f"{window_timeout / window_episodes:.4f}" if window_episodes else "",
                     "critic_loss": f"{averaged['critic_loss']:.6f}",
                     "actor_loss": f"{averaged['actor_loss']:.6f}",
                     "q1": f"{averaged['q1']:.5f}",
@@ -404,11 +420,12 @@ def main() -> None:
                 traj_file.flush()
                 for key in ("critic_loss", "actor_loss", "q1", "target_q"):
                     tensorboard.add_scalar(f"train/{key}", averaged[key], global_frame)
-                tensorboard.add_scalar(
-                    "train/success_rate",
-                    window_success / max(window_episodes, 1),
-                    global_frame,
-                )
+                if window_episodes:  # 空窗口不写点,否则 tb 曲线会被一堆假的 0 拉平
+                    tensorboard.add_scalar(
+                        "train/success_rate",
+                        window_success / window_episodes,
+                        global_frame,
+                    )
                 tensorboard.add_scalar(
                     "train/stddev",
                     agent.stddev(global_frame),

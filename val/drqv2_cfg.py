@@ -14,7 +14,8 @@ STRIDE = 1
 VAL_STEPS = 0
 EPISODE_S = 15.0
 STOP_N = 3
-SEED = 0
+SEED = 0  # val 自己的评估 seed。
+TRAIN_SEED = 1  # 训练时用的 seed,**必须与 train/drqv2_cfg.py 的 SEED 一致**;用来定位 _seed{N} 输出目录。
 DEVICE = None
 
 RENDERING_MODE = "balanced"

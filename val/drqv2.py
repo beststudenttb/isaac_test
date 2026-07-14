@@ -19,6 +19,7 @@ parser.add_argument("--num-envs", type=int, default=None)
 parser.add_argument("--num-episodes", type=int, default=int(cfg.NUM_EPISODES))
 parser.add_argument("--start", type=int, default=int(cfg.START))
 parser.add_argument("--stride", type=int, default=int(cfg.STRIDE))
+parser.add_argument("--seed", type=int, default=None)
 parser.add_argument("--random-stop", action="store_true")
 parser.add_argument("--noise", action="store_true")
 parser.add_argument("--show", action="store_true")
@@ -98,12 +99,22 @@ class TrajBuffer:
         self.rows.append(row)
 
 
+def run_seed() -> int:
+    """**训练**时用的 seed —— 用来定位输出目录,必须和 train/drqv2.py 的 output_dir() 一致。
+
+    注意和 cfg.SEED 区分:后者是 val 自己的评估 seed(默认 0),跟训练目录无关。
+    """
+    return int(args_cli.seed) if args_cli.seed is not None else int(cfg.TRAIN_SEED)
+
+
 def root_dir() -> Path:
     path = Path(cfg.OUT_DIR)
     if args_cli.random_stop:
         path = path.with_name(path.name + str(cfg.RANDOM_STOP_SUFFIX))
     if args_cli.noise:
         path = path.with_name(path.name + str(cfg.NOISE_SUFFIX))
+    if run_seed() != int(cfg.TRAIN_SEED):
+        path = path.with_name(f"{path.name}_seed{run_seed()}")
     return path
 
 
