@@ -9,7 +9,10 @@ RANDOM_STOP_SUFFIX = "_random_stop"  # --random-stop 时输出目录追加后缀
 CLEAR_OUT_DIR = True  # 从头训练时清空输出目录。
 
 OBS_MODE = "spr_z"  # "spr_z"(冻结 SPR z + goal) 或 "pixels"(DrQ-v2 原版:可训练 CNN + 增广)。
-SPR_CKPT = Path("./models/rl/spr_student/stage1_end.pt")  # spr_z 模式的冻结 encoder 来源。
+# spr_z 模式的冻结 encoder 来源。指向保全的副本而不是 models/rl/spr_student/stage1_end.pt:
+# (1) 那个目录会被下次 SPR 跑的 CLEAR_OUT_DIR 清掉;(2) 这份(md5 cfd52c0f)正是 σ 调度消融
+# 那次 PPO 用的同一个 encoder —— arm A 的意义就是"同一个 z,只换算法",encoder 必须逐字节一致。
+SPR_CKPT = Path("./models/rl/_encoders/stage1_sigma_ablation.pt")
 
 NUM_ENVS = 32  # 并行环境数量。
 TOTAL_ENV_STEPS = 2_000_000  # 总采样 env 步数(所有 env 合计)。
