@@ -289,6 +289,18 @@ def stage_teacher_coef(step: int, stage: int) -> float:
     return float(cfg.TEACHER_LOSS) * max(1.0 - frac, 0.0)
 
 
+def scheduled_std(update: int) -> float:
+    """外生 σ 调度:stage1 结束后线性 STD_START -> STD_END,之后保持 STD_END。
+
+    消融用:PPO 的 log_std 梯度在本任务 reward 下拿不到信号(SPR 线两次都被钉在 STD_MAX
+    的 clamp 上),而成功要求三维动作同时 |a_i| < STOP_EPS,发现概率 ~ [2Φ(STOP_EPS/σ)-1]³。
+    两条成功的线(MDP anneal 自由衰减、DrQ-v2 外生调度)都在 σ≈0.12-0.13 处 success 起飞。
+    """
+    span = max(int(cfg.STD_ANNEAL_UPDATES), 1)
+    frac = min(max((update - int(cfg.STAGE1_UPDATES)) / span, 0.0), 1.0)
+    return (1.0 - frac) * float(cfg.STD_START) + frac * float(cfg.STD_END)
+
+
 def std_info(model: SPRActorCritic) -> dict[str, float]:
     std = torch.exp(model.log_std.detach())
     return {
@@ -504,6 +516,9 @@ def main() -> None:
         init_std=float(cfg.STD_INIT),
     ).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=float(cfg.LR), eps=1e-5)
+    if bool(cfg.STD_SCHEDULE):
+        model.log_std.requires_grad_(False)  # σ 由调度决定,不再由 PPO 的梯度学。
+        print(f"[INFO] std schedule ON: {cfg.STD_START} -> {cfg.STD_END} over {cfg.STD_ANNEAL_UPDATES} updates (log_std frozen, clamp disabled)")
     teacher = load_teacher(device)
     teacher_coef = 0.0
     if (int(cfg.STAGE1_STEPS) > 0 or int(cfg.STAGE2_STEPS) > 0 or int(cfg.STAGE3_STEPS) > 0) and teacher is None:
@@ -533,6 +548,9 @@ def main() -> None:
             step_start = (update - 1) * steps_per_update
             stage = stage_of(step_start)
             teacher_coef = stage_teacher_coef(step_start, stage)
+            if bool(cfg.STD_SCHEDULE):
+                with torch.no_grad():
+                    model.log_std.fill_(math.log(scheduled_std(update)))
             if prev_stage != 0 and stage != prev_stage:
                 prev_coef = float(last_info.get("teacher_coef", 0.0))
                 save_model(log_dir / f"stage{prev_stage}_end.pt", model, opt, update - 1, step_start, best, prev_coef, last_info)
@@ -653,8 +671,8 @@ def main() -> None:
                     teacher_loss_type=str(cfg.TEACHER_LOSS_TYPE),
                     update_spr=update_spr,
                     actor_encoder_coef=float(cfg.ACTOR_ENCODER_COEF),
-                    log_std_min=math.log(float(cfg.STD_MIN)),
-                    log_std_max=math.log(float(cfg.STD_MAX)),
+                    log_std_min=None if bool(cfg.STD_SCHEDULE) else math.log(float(cfg.STD_MIN)),
+                    log_std_max=None if bool(cfg.STD_SCHEDULE) else math.log(float(cfg.STD_MAX)),
                 )
             learn_s = time.perf_counter() - learn_start
             step_done = min(update * steps_per_update, total_steps)
