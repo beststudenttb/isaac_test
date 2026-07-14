@@ -232,12 +232,25 @@ def camera_rgb(env: MDPStudentEnv) -> torch.Tensor:
     return image
 
 
+def teacher_required() -> bool:
+    """是否需要加载 teacher 策略。
+
+    注意:阶段1 的 rollout 完全由 teacher 加噪带跑(采集 SPR 的训练数据),阶段2/3 用 teacher
+    算 BC loss —— 只要这三个阶段有 step,就必须加载 teacher。`TEACHER_LOSS` 只决定 BC loss
+    的权重,**不**决定要不要 teacher 本身:σ 调度消融里 TEACHER_LOSS=0(不做 BC)但 stage1
+    仍然要 teacher 来采数据。
+    """
+    if int(cfg.STAGE1_STEPS) > 0 or int(cfg.STAGE2_STEPS) > 0 or int(cfg.STAGE3_STEPS) > 0:
+        return True
+    return (
+        float(cfg.TEACHER_LOSS) > 0.0
+        or float(cfg.TEACHER_UP_OUT) > 0.0
+        or float(cfg.TEACHER_UP_TIMEOUT) > 0.0
+    )
+
+
 def load_teacher(device: torch.device):
-    if (
-        float(cfg.TEACHER_LOSS) <= 0.0
-        and float(cfg.TEACHER_UP_OUT) <= 0.0
-        and float(cfg.TEACHER_UP_TIMEOUT) <= 0.0
-    ):
+    if not teacher_required():
         return None
     path = Path(teacher_path())
     if not path.exists():
@@ -492,6 +505,11 @@ def main() -> None:
     if int(cfg.SAVE_UPDATE_EVERY) > 0:
         update_dir.mkdir(parents=True, exist_ok=True)
     tb = SummaryWriter(str(log_dir / "tb"))
+
+    # 起 Isaac 之前先把配置错误炸掉:make_env 之后再 raise 的话,Kit 的 shutdown 会挂死十几分钟,
+    # 看起来像是"在跑但没输出"(07-14 踩过)。
+    if teacher_required() and not Path(teacher_path()).exists():
+        raise FileNotFoundError(f"teacher model not found: {teacher_path()}")
 
     env = make_env()
     device = torch.device(env.device)
