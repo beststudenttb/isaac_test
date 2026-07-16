@@ -45,6 +45,8 @@ approved_models/
 | `2026_07_13_spr_student_bc1` | SPR student | 130 | 同上；`TEACHER_LOSS=1`（反证实验，成绩差，保留是为了结论）|
 | `2026_07_14_spr_teacher5` | SPR student | 130 | `stage1_end.pt` + `teacher_best_val.zip`；`TEACHER_LOSS=5`/`STD_MAX=0.1`（反面结果：BC 段 100%，teacher 一撤塌到 0%）|
 | `2026_07_14_drqv2_pixels` | DrQ-v2 像素 student（off-policy） | 224×224×3 + 2 | **无**：无特权信息、无 teacher、无 BC；干净 env（非 noise）|
+| `2026_07_16_spr_jsrl` | SPR-PPO + JSRL 反向课程 | 130 | 冻结 stage1 z（与 arm A 同一份，hash `84fd8456`）+ teacher 带路；noise env（反面结果：课程救不了 σ 病，只到 62.5%）|
+| `2026_07_16_drqv2_noise` | DrQ-v2 像素 student（off-policy） | 224×224×3 + 2 | **无**：无特权、无 teacher、无 BC；noise env（离线 99.2%，可与 SPR/MDP/JSRL 横比）|
 
 说明：
 
@@ -59,5 +61,6 @@ approved_models/
 - 三条 SPR 线的 `stage1_end.pt` **互不相同**（`2026_07_10_spr_student_center` = `e9464932...`、`2026_07_13_spr_student_bc1` = `ef6d8647...`、`2026_07_14_spr_teacher5` = `696811c7...`），每次 stage1 都重训过；跨实验对比时 encoder 不是单变量。
 - `2026_07_13_spr_student_bc1` 与 `2026_07_10_mdp_student_anneal` 的 `TEACHER_LOSS` 都是 1.0，是目前 SPR/MDP 两条线在 BC 权重上唯一对齐的一组：BC-only 段两者离线成绩都是 ~0%，PPO 接手后 MDP 涨到 96%、SPR 塌到 0%。
 - `2026_07_14_drqv2_pixels` 的 `best_offline.pt` 是 **eval-only**（`critic`/`critic_target` 已剥离以过 GitHub 100 MB 单文件上限），可推理、不能续训；完整 checkpoint 只在训练现场 `models/` 里。
+- `2026_07_16_spr_jsrl` 与 `2026_07_14_drqv2_pixels` 的 arm A 用的是**同一个冻结 SPR encoder**（权重 hash 都是 `84fd8456...`，即 `_encoders/stage1_sigma_ablation.pt`）。这是"同一个 z、只换算法"的判决对照：off-policy(DrQ-v2) 100% vs on-policy(PPO+反向课程) 62.5%。JSRL 的 `raw_std_max` 整段焊死在 0.3 clamp（`a_w` 转头维度），是 62% 天花板的根因。
 - **σ 是目前唯一能划分成功/失败的变量**：成功要求三维动作同时 `|a_i| < 0.05`，发现概率 `≈ [2Φ(0.05/σ)−1]³`。两条成功的线（MDP anneal 自由衰减到 0.033、DrQ-v2 调度到 0.10）都在 **σ ≈ 0.12–0.13** 处 success 起飞；两条失败的 SPR PPO 线的 σ 分别被钉死在 0.299 和 0.100（都顶着 `STD_MAX` clamp，梯度还想往上）。
 - reward 常数在 06-30（commit `ac1604b`）改过：`R_STOP` 从 3.0 → **0.0**（stop 区内的稠密奖励被关闭），只剩终止时的 `R_SUCCESS * stop_q`。`2026_06_27_weekend_students` 及更早的线跑的是 `R_STOP=3.0`；`2026_07_08` 之后的所有线（含 MDP anneal、SPR、DrQ-v2）跑的是 `R_STOP=0.0`。对比历史实验时必须注意这条。

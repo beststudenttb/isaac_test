@@ -74,6 +74,9 @@ SPR 当前实现状态：
 - teacher MSE 只监督 actor mean，不会直接约束 `log_std`；若 std 发散，需要单独处理 std 或使用 NLL 作为诊断实验。
 - rl_games PPO 环境包已能在云端训练和本地 preview；云端 runs/checkpoint 容易占用大量磁盘，后续只保留必要 best/last 和关键 CSV。
 - 近期 SPR student 的一次训练中 SPR 实际未激活，std 发散主要来自 PPO 采样、action clamp 和稀疏成功信号；当前已改为从训练开始启用 SPR。
+- （07-13 起）新开 off-policy 线（DrQ-v2，`train/drqv2.py` / `train/drq_student.py`）。σ 是**调度**出来的（不被学），replay 复用稀有成功，eval 是确定性 μ——绕开 PPO 的 σ 死结。刻意不用 SAC。
+- **σ 是目前唯一能划分成功/失败的变量**：成功要求三维 `|a_i|<0.05` 同时，发现概率 `≈[2Φ(0.05/σ)-1]³`。三条成功线（MDP anneal 0.12、DrQ-v2 0.13、SPR σ 调度 0.13）都在同一膝盖起飞；失败的 SPR-PPO 线 σ 被钉在 clamp（0.299/0.100）。
+- reward 侧根因：`R_STOP=0.0`（stop 区稠密奖励关闭），且 `d_gain`（0.0018/步）< `K_TIME`（0.003/步），**shaping 在惩罚"靠近"**；唯一能压过的是终止 `R_SUCCESS=10`，只有 replay 能沿轨迹反传，PPO 的 GAE + 死 critic 传不动。
 
 ## 近期实验结论
 
@@ -83,6 +86,10 @@ SPR 当前实现状态：
 - stop 区域 reward 仍是关键不稳定来源：密集 stop 奖励可能诱导刷分或边缘行为，纯 success 信号又过于稀疏。
 - 随机 stop 任务已经具备基本代码路径；后续重点是检查任务目标进入 state 后是否真的被策略利用。
 - 自监督表征要想超过人工 px/dist，需要更复杂或更难人工表征的任务，否则简单 docking 上人工几何特征天然占优。
+- **（判决结论）SPR 表征没问题，失败是算法。** 同一个冻结 SPR z（hash `84fd8456`）：PPO（σ 调度/无 BC）峰值 28% 后塌 0，PPO+BC teacher 撤光 0%，而 **DrQ-v2（off-policy）离线 100%**（de 0.022m、xe 0.9px）。唯一变量是算法。
+- **critic 友好度实验证实是信用分配、不是表征**：同一批 teacher 数据 + 同一 [64,64] MLP，监督拟合折扣回报 R² 里 SPR z（0.84）> MDP/oracle（0.78）——z 对 critic 最友好；但 TD(0) 连 oracle 都学不出，n=17（GAE 视野）才逼近上界。稀疏终止奖励 on-policy 撞一次用一次、只传 17 步，off-policy replay 反复回放整条轨迹——这才是 100% vs 0% 的机制。
+- **JSRL + 反向课程（on-policy）是「课程救不了 σ 病」的反面证据**：同一个 z，课程让 success 从 0 爬到 62.5% 就卡死，`a_w`（转头维）σ 顶死 0.3 clamp；课程解决了"走到区"、解决不了"精确对准"。
+- off-policy 线三个满分级结果：DrQ-v2 干净版 97.7%、noise 版 99.2%、arm A（冻结 SPR z）100%，均已归档。
 
 当前目录约定：
 
@@ -94,7 +101,7 @@ SPR 当前实现状态：
 - `models/` 放训练现场输出，不上传 Git。
 - `approved_models/` 放确认保留的模型和说明，需要上传 Git。
 - `approved_models/` 中每个确认实验应尽量自包含：policy、teacher、视觉预训练、MDP/SPR checkpoint、配置和 trajectory 都要能复现。
-- 最新确认归档：`approved_models/2026_07_05_spr_student/`，包含 SPR student 的 policy、SPR checkpoint、teacher、配置和关键轨迹。
+- 最新确认归档（off-policy 线）：`approved_models/2026_07_14_drqv2_pixels/`（干净 97.7%）、`2026_07_16_drqv2_noise/`（noise 99.2%）、`2026_07_16_spr_jsrl/`（PPO+课程反面结果 62.5%）；arm A（冻结 SPR z + DrQ-v2，离线 100%）在 `models/rl/drq_student_spr/`，待归档。SPR-PPO 反面对照：`2026_07_13_spr_student_bc1`、`2026_07_14_spr_teacher5`。
 - `summary/` 放规则、项目状态、TODO 和每日总结。
 - `data_isaac/` 放本地生成数据，不上传 Git。
 

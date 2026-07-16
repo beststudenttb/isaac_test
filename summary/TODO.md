@@ -1,5 +1,13 @@
 # TODO
 
+## off-policy 线（DrQ-v2，当前重点）
+
+- **arm A 多 seed（优先，便宜）**：冻结同一个 z（`_encoders/stage1_sigma_ablation.pt`）跑 seed 2/3，`SEED=N ./scripts/run_drq_student_pipeline.sh`（`_seed{N}` 目录不覆盖）。把 n=1 的 100% 变成 n=3 mean±std——核心 claim 现在只压在一个 seed 上。
+- **JSRL 重跑**（`STD_MAX=0.1` + 10 档阶梯，代码已审无 bug）判据：确定性 val 轨迹**干净且精确**——xe<10px、de<0.2m 才算成（σ 病被压 σ 治好）；干净但仍 xe~20px = 只是安静的错 μ，on-policy 受数据量限，停、换机制。快失败：掉到 f≤0.5 卡住 = clamp 没用。
+- arm A 归档：`models/rl/drq_student_spr/`（离线 100%）挑 best 存进 `approved_models/`（policy 只含 spr_z，配 `_encoders/stage1_sigma_ablation.pt`）。
+- 若 JSRL 也不行，后续机制（未定）：teacher demo 灌 replay（`collect_mdp_dataset.py` 有先例）、critic 预热、per-dim σ clamp、或模型式 off-policy（TD-MPC2 在冻结 z 上，规划省样本）。
+- **暂放**：球全随机生成 + 找不到球快速旋转（teacher 没给旋转奖励/全局生成阶段），先把前方停车做稳。
+
 ## 采集与数据验证
 
 - 确认手动修改后的 `assets/robots/ball_robot.usd` 中 eye 俯仰角、相机挂载结构和碰撞设置是否符合后续训练需求。
