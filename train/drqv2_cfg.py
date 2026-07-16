@@ -50,5 +50,7 @@ STDDEV_DURATION = 1_500_000
 STDDEV_CLIP = 0.3
 AUG_PAD = 4
 
-SAVE_EVERY_FRAMES = 25_000
+# 每多少个 tick(= update)存一次 checkpoint,文件名 drqv2_{tick:06d}.pt(对齐 SPR 的 full_{update:06d})。
+# tick 总数 = TOTAL_FRAMES / num_envs;32 env 下 2M frame = 62500 tick,除以 SAVE_UPDATE_EVERY 得 checkpoint 数。
+SAVE_UPDATE_EVERY = 780  # 32 env: ~80 个 checkpoint。
 LOG_EVERY_TICKS = 25

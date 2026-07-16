@@ -19,7 +19,6 @@ parser.add_argument("--num-envs", type=int, default=None)
 parser.add_argument("--num-episodes", type=int, default=int(cfg.NUM_EPISODES))
 parser.add_argument("--start", type=int, default=int(cfg.START))
 parser.add_argument("--stride", type=int, default=int(cfg.STRIDE))
-parser.add_argument("--seed", type=int, default=None)
 parser.add_argument("--random-stop", action="store_true")
 parser.add_argument("--noise", action="store_true")
 parser.add_argument("--show", action="store_true")
@@ -51,7 +50,8 @@ from src.noise_env import NoiseStudentEnvCfg, make_noise_student_env
 
 VAL_FIELDS = [
     "checkpoint",
-    "frame",
+    "update",
+    "step",
     "num_envs",
     "num_episodes",
     "episodes",
@@ -99,26 +99,16 @@ class TrajBuffer:
         self.rows.append(row)
 
 
-def run_seed() -> int:
-    """**训练**时用的 seed —— 用来定位输出目录,必须和 train/drqv2.py 的 output_dir() 一致。
-
-    注意和 cfg.SEED 区分:后者是 val 自己的评估 seed(默认 0),跟训练目录无关。
-    """
-    return int(args_cli.seed) if args_cli.seed is not None else int(cfg.TRAIN_SEED)
-
-
 def root_dir() -> Path:
     path = Path(cfg.OUT_DIR)
     if args_cli.random_stop:
         path = path.with_name(path.name + str(cfg.RANDOM_STOP_SUFFIX))
     if args_cli.noise:
         path = path.with_name(path.name + str(cfg.NOISE_SUFFIX))
-    if run_seed() != int(cfg.TRAIN_SEED):
-        path = path.with_name(f"{path.name}_seed{run_seed()}")
     return path
 
 
-def checkpoint_frame(path: Path) -> int:
+def checkpoint_update(path: Path) -> int:
     return int(path.stem.split("_")[-1])
 
 
@@ -423,14 +413,14 @@ def main() -> None:
 
     checkpoint_paths = sorted(
         update_dir.glob("drqv2_*.pt"),
-        key=checkpoint_frame,
+        key=checkpoint_update,
     )
     start = int(args_cli.start)
     stride = int(args_cli.stride)
     if stride <= 0:
         raise ValueError(f"stride must be positive: {stride}")
     checkpoint_paths = [
-        path for path in checkpoint_paths if checkpoint_frame(path) >= start
+        path for path in checkpoint_paths if checkpoint_update(path) >= start
     ][::stride]
     if not checkpoint_paths:
         raise FileNotFoundError(
@@ -481,20 +471,22 @@ def main() -> None:
                 agent.load_checkpoint(checkpoint["agent"])
                 agent.set_training(False)
 
-                frame = int(checkpoint.get("frame", checkpoint_frame(path)))
+                update = int(checkpoint["update"])
+                step = int(checkpoint["step"])
                 traj_buffer = TrajBuffer()
                 info = evaluate(
                     env,
                     agent,
                     path.name,
-                    frame,
+                    step,
                     int(args_cli.num_episodes),
                     traj_buffer,
                     env0_writer,
                 )
                 row = {
                     "checkpoint": path.name,
-                    "frame": frame,
+                    "update": update,
+                    "step": step,
                     "num_envs": env.num_envs,
                     "num_episodes": int(args_cli.num_episodes),
                     "episodes": env.num_envs * int(args_cli.num_episodes),
@@ -521,7 +513,7 @@ def main() -> None:
                     )
 
                 print(
-                    f"[INFO] checkpoint={path.name} frame={frame} "
+                    f"[INFO] checkpoint={path.name} update={update} step={step} "
                     f"success={row['success_rate']:.4f} "
                     f"fail={row['fail_rate']:.4f} "
                     f"timeout={row['timeout_rate']:.4f} "
@@ -532,7 +524,7 @@ def main() -> None:
 
     assert best_row is not None and best_path is not None
     print(
-        f"[INFO] best={best_path.name} frame={best_row['frame']} "
+        f"[INFO] best={best_path.name} update={best_row['update']} step={best_row['step']} "
         f"success={best_row['success_rate']:.4f} "
         f"fail={best_row['fail_rate']:.4f} "
         f"timeout={best_row['timeout_rate']:.4f}"

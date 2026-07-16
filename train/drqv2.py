@@ -22,7 +22,6 @@ import drqv2_cfg as cfg
 
 parser = argparse.ArgumentParser(description="Train DrQ-v2 from stacked RGB.")
 parser.add_argument("--num-envs", type=int, default=None)
-parser.add_argument("--seed", type=int, default=None)
 parser.add_argument("--random-stop", action="store_true")
 parser.add_argument("--noise", action="store_true")
 parser.add_argument("--show", action="store_true")
@@ -91,19 +90,12 @@ TRAJ_FIELDS = [
 ]
 
 
-def run_seed() -> int:
-    return int(args_cli.seed) if args_cli.seed is not None else int(cfg.SEED)
-
-
 def output_dir() -> Path:
     path = Path(cfg.OUT_DIR)
     if args_cli.random_stop:
         path = path.with_name(path.name + str(cfg.RANDOM_STOP_SUFFIX))
     if args_cli.noise:
         path = path.with_name(path.name + str(cfg.NOISE_SUFFIX))
-    if run_seed() != int(cfg.SEED):
-        # 多 seed 必须各写各的目录,否则 CLEAR_OUT_DIR 会让它们互相吃掉。
-        path = path.with_name(f"{path.name}_seed{run_seed()}")
     if bool(cfg.CLEAR_OUT_DIR) and path.exists():
         shutil.rmtree(path)
     path.mkdir(parents=True, exist_ok=True)
@@ -129,7 +121,7 @@ def end_range() -> tuple[float, float, float, float]:
 def make_env() -> MDPStudentEnv:
     end_d_min, end_d_max, end_x_min, end_x_max = end_range()
     env_cfg = NoiseStudentEnvCfg() if args_cli.noise else MDPStudentEnvCfg()
-    env_cfg.seed = run_seed()
+    env_cfg.seed = int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
     env_cfg.stop_n = int(cfg.STOP_N)
     env_cfg.scene.num_envs = (
@@ -190,7 +182,6 @@ def write_config(path: Path, env: MDPStudentEnv, obs_shape: tuple[int, int, int]
             f"OBS_SHAPE = {obs_shape!r}",
             f"RANDOM_STOP = {bool(args_cli.random_stop)!r}",
             f"NOISE = {bool(args_cli.noise)!r}",
-            f"SEED_USED = {run_seed()!r}",
         )
     )
     (path / "config.py").write_text(
@@ -203,12 +194,14 @@ def save_checkpoint(
     path: Path,
     agent: DrQV2Agent,
     agent_cfg: dict,
+    update: int,
     frame: int,
 ) -> None:
     torch.save(
         {
             "algorithm": "drqv2",
-            "frame": int(frame),
+            "update": int(update),
+            "step": int(frame),
             "agent_cfg": agent_cfg,
             "agent": agent.checkpoint(),
         },
@@ -224,7 +217,7 @@ def open_csv(path: Path, fields: list[str]):
 
 
 def main() -> None:
-    seed = run_seed()
+    seed = int(cfg.SEED)
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -268,7 +261,6 @@ def main() -> None:
 
     global_frame = 0
     tick = 0
-    next_save = int(cfg.SAVE_EVERY_FRAMES)
     start_time = time.perf_counter()
     window_collect_s = 0.0
     window_learn_s = 0.0
@@ -374,14 +366,16 @@ def main() -> None:
                     window_updates += 1
                 window_learn_s += time.perf_counter() - learn_start
 
-            while global_frame >= next_save:
+            # 每 SAVE_UPDATE_EVERY 个 tick 存一次;文件名用 tick 序号(= update 号),与 SPR 的
+            # full_{update:06d}.pt 一致。存的 dict 里带 step(env 帧数),val 报告用它。
+            if tick % int(cfg.SAVE_UPDATE_EVERY) == 0:
                 save_checkpoint(
-                    update_dir / f"drqv2_{global_frame:08d}.pt",
+                    update_dir / f"drqv2_{tick:06d}.pt",
                     agent,
                     agent_cfg,
+                    tick,
                     global_frame,
                 )
-                next_save += int(cfg.SAVE_EVERY_FRAMES)
 
             if tick % int(cfg.LOG_EVERY_TICKS) == 0:
                 elapsed = max(window_collect_s + window_learn_s, 1e-9)
@@ -441,6 +435,7 @@ def main() -> None:
             out_dir / "last.pt",
             agent,
             agent_cfg,
+            tick,
             global_frame,
         )
         duration = time.perf_counter() - start_time
