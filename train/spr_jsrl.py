@@ -251,6 +251,11 @@ def main() -> None:
         pi_hidden=list(cfg.POLICY_NET), vf_hidden=list(cfg.VALUE_NET),
         activation=ACTIVATIONS[str(cfg.ACTIVATION)], init_std=float(cfg.STD_INIT),
     ).to(device)
+    # 末层小增益初始化：让初始 μ≈0（标准 PPO 策略头做法，共享 mlp 未做）。
+    # 否则默认 Kaiming 权重下初始 μ 非零（实测 a_y≈+0.12），σ=0.1 无 BC 时会锁死漂移。
+    actor_head = [m for m in model.actor if isinstance(m, nn.Linear)][-1]
+    actor_head.weight.data.mul_(0.01)
+    nn.init.zeros_(actor_head.bias)
     opt = torch.optim.Adam(model.parameters(), lr=float(cfg.LR), eps=1e-5)
     teacher = load_teacher(device)
 

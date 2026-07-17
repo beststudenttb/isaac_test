@@ -90,6 +90,7 @@ SPR 当前实现状态：
 - **critic 友好度实验证实是信用分配、不是表征**：同一批 teacher 数据 + 同一 [64,64] MLP，监督拟合折扣回报 R² 里 SPR z（0.84）> MDP/oracle（0.78）——z 对 critic 最友好；但 TD(0) 连 oracle 都学不出，n=17（GAE 视野）才逼近上界。稀疏终止奖励 on-policy 撞一次用一次、只传 17 步，off-policy replay 反复回放整条轨迹——这才是 100% vs 0% 的机制。
 - **JSRL + 反向课程（on-policy）是「课程救不了 σ 病」的反面证据**：同一个 z，课程让 success 从 0 爬到 62.5% 就卡死，`a_w`（转头维）σ 顶死 0.3 clamp；课程解决了"走到区"、解决不了"精确对准"。
 - off-policy 线三个满分级结果：DrQ-v2 干净版 97.7%、noise 版 99.2%、arm A（冻结 SPR z）100%，均已归档。
+- **（07-17）JSRL 初始化修复 + 停止微调判决**：查出 SPR-PPO 失败还有一层是 **actor 末层默认 Kaiming 初始化**（末尾无 tanh 居中）→ 初始 `μ_y≈+0.12` 漂移；`train/spr_jsrl.py` 加末层小增益初始化（`weight*0.01 + bias=0`，纯局部不碰共享框架）后初始 μ≈0。修后 a_y 的 σ 收到 0.042，但 **σ 病搬到 a_x/a_w（精度维顶死 0.1 clamp）**；崩点轨迹 = student 独扛接近段后**过冲**（dist 1.1<1.5 穿过停车带）；课程控制器另有病（进档靠 teacher 灌水的 ema、回火级联每档只待 cooldown 11 步不巩固）。h=60 给 293 update 仍卡 0.66。**结论：课程+初始化治不了精确刹停/对准（稀疏终止信用传不到精度维），停止微调 JSRL，重心转世界模型（Dreamer/TD-MPC on SPR latent）。** 详见 `summary/2026_07_17_ubuntu.md`。
 
 当前目录约定：
 

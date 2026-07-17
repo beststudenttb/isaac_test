@@ -1,11 +1,20 @@
 # TODO
 
-## off-policy 线（DrQ-v2，当前重点）
+## 世界模型线（新重点，07-17 起）
 
-- **arm A 多 seed（优先，便宜）**：冻结同一个 z（`_encoders/stage1_sigma_ablation.pt`）跑 seed 2/3，`SEED=N ./scripts/run_drq_student_pipeline.sh`（`_seed{N}` 目录不覆盖）。把 n=1 的 100% 变成 n=3 mean±std——核心 claim 现在只压在一个 seed 上。
-- **JSRL 重跑**（`STD_MAX=0.1` + 10 档阶梯，代码已审无 bug）判据：确定性 val 轨迹**干净且精确**——xe<10px、de<0.2m 才算成（σ 病被压 σ 治好）；干净但仍 xe~20px = 只是安静的错 μ，on-policy 受数据量限，停、换机制。快失败：掉到 f≤0.5 卡住 = clamp 没用。
+- **在冻结/共学习 SPR latent 上起 Dreamer / TD-MPC 骨架**：model-based off-policy = 样本效率天花板，直指 Regime B（实机、少样本、逐次适应）。**用现成 repo（dreamerv3 / SheepRL）接 Isaac 向量化 env，别从零手写**（几天工作量，非过夜盲挂）。见记忆 `research-direction-and-strategy`。
+- 定位：把"感知（表征）+ 决策（策略）"统一进一个学习对象（world model 正是这一体）。这是 Master 论文的天花板线；off-policy 机制论文是地板。
+
+## off-policy 线（DrQ-v2，地板）
+
+- **arm A 多 seed（优先，便宜）**：冻结同一个 z（`_encoders/stage1_sigma_ablation.pt`）跑 seed 2/3，把 n=1 的 100% 变成 n=3 mean±std。注意现状 seed 写死 cfg、`CLEAR_OUT_DIR=True`，多 seed 需先加 SEED/OUT_DIR 覆盖 + 独立目录，否则清掉已有结果。
 - arm A 归档：`models/rl/drq_student_spr/`（离线 100%）挑 best 存进 `approved_models/`（policy 只含 spr_z，配 `_encoders/stage1_sigma_ablation.pt`）。
-- 若 JSRL 也不行，后续机制（未定）：teacher demo 灌 replay（`collect_mdp_dataset.py` 有先例）、critic 预热、per-dim σ clamp、或模型式 off-policy（TD-MPC2 在冻结 z 上，规划省样本）。
+
+## JSRL（on-policy，已判定停止微调 → 归档负结果）
+
+- **结论（07-17）**：初始化修复后 σ 病搬到 a_x/a_w（精度维顶 clamp）、过冲崩点、课程控制器 bang-bang；h=60 给 293 update 仍卡 0.66。**课程+初始化治不了精确刹停/对准，停止微调。** 等本次 val 跑完归档为负结果。
+- 可选收尾：固定 h=90/105 + 禁 ladder 探针（一行 cfg），把"控制器太快 vs σ 病墙"分离干净，让负结果投稿无懈可击。
+- on-policy 回归**真扳机**（只有这些值得回）：不靠 replay 把稀疏终止信用送到精度维——奖励重分配/return decomposition、per-dim σ 控制、刹车段 dense 辅助信号。
 - **暂放**：球全随机生成 + 找不到球快速旋转（teacher 没给旋转奖励/全局生成阶段），先把前方停车做稳。
 
 ## 采集与数据验证
