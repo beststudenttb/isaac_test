@@ -216,6 +216,28 @@ def open_csv(path: Path, fields: list[str]):
     return file, writer
 
 
+def fmt_value(value) -> str:
+    if isinstance(value, float):
+        if abs(value) >= 1000:
+            return f"{value:.0f}"
+        return f"{value:.3f}"
+    return str(value)
+
+
+def print_log(groups: list[tuple[str, list[tuple[str, object]]]]) -> None:
+    rows = []
+    for group, items in groups:
+        rows.append((f"{group}/", ""))
+        rows.extend((f"  {key}", fmt_value(value)) for key, value in items)
+    width_l = max(len(left) for left, _ in rows)
+    width_r = max(len(right) for _, right in rows)
+    line = "-" * (width_l + width_r + 7)
+    print(line)
+    for left, right in rows:
+        print(f"| {left:<{width_l}} | {right:>{width_r}} |")
+    print(line)
+
+
 def main() -> None:
     seed = int(cfg.SEED)
     random.seed(seed)
@@ -379,7 +401,6 @@ def main() -> None:
 
             if tick % int(cfg.LOG_EVERY_TICKS) == 0:
                 elapsed = max(window_collect_s + window_learn_s, 1e-9)
-                frames_in_window = int(cfg.LOG_EVERY_TICKS) * env.num_envs
                 averaged = {
                     key: metric_sums.get(key, 0.0) / max(window_updates, 1)
                     for key in ("critic_loss", "actor_loss", "q1", "target_q")
@@ -387,7 +408,8 @@ def main() -> None:
                 row = {
                     "tick": tick,
                     "frame": global_frame,
-                    "fps": f"{frames_in_window / elapsed:.1f}",
+                    # fps = 仿真步/秒(每秒 env.step 次数,不乘 env 数)
+                    "fps": f"{int(cfg.LOG_EVERY_TICKS) / elapsed:.1f}",
                     "collect_s": f"{window_collect_s:.3f}",
                     "learn_s": f"{window_learn_s:.3f}",
                     "episodes": window_episodes,
@@ -417,10 +439,32 @@ def main() -> None:
                     agent.stddev(global_frame),
                     global_frame,
                 )
-                print(
-                    f"[INFO] frame={global_frame} fps={row['fps']} "
-                    f"replay={replay.num_transitions} updates={window_updates} "
-                    f"success={row['success_rate']} std={row['stddev']}"
+                print_log(
+                    [
+                        (
+                            "rollout",
+                            [
+                                ("tick", tick),
+                                ("step", global_frame),
+                                ("fps", float(row["fps"])),
+                                ("sigma", agent.stddev(global_frame)),
+                                ("success_rate", window_success / max(window_episodes, 1)),
+                                ("fail_rate", window_fail / max(window_episodes, 1)),
+                                ("timeout_rate", window_timeout / max(window_episodes, 1)),
+                                ("buffer_frames", replay.num_transitions),
+                            ],
+                        ),
+                        (
+                            "learn",
+                            [
+                                ("updates", int(window_updates)),
+                                ("critic_loss", averaged["critic_loss"]),
+                                ("actor_loss", averaged["actor_loss"]),
+                                ("q1_mean", averaged["q1"]),
+                                ("q_target_mean", averaged["target_q"]),
+                            ],
+                        ),
+                    ]
                 )
                 window_collect_s = 0.0
                 window_learn_s = 0.0

@@ -27,3 +27,11 @@ random_*.zip
 rl_games_ball/*.pth
 cv_xd_compare.csv
 old_cv_features.csv
+
+# 归档模型:原目录含 >100MB 单文件(GitHub 硬限制),改用 _release/ 下的 eval zip
+# (SRL encoder 三次共用只存一份、RL actor 单独、critic 剥离)。原目录与 critic 留在服务器。
+approved_models/2026_07_22_drq_student_spr_z/
+approved_models/2026_07_22_drq_student_spr_z_4m/
+approved_models/2026_07_23_drq_student_spr_z_angle60/
+approved_models/2026_07_23_drqv2_pixels_random_stop/
+approved_models/_release/*_critic.pt

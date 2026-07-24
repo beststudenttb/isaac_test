@@ -1,9 +1,12 @@
 """JSRL SPR-PPO offline val config。checkpoint 全是 full_*.pt(自包含),不需要 SPR 基文件。"""
 
+import os
 from pathlib import Path
 
 
-OUT_DIR = Path("./models/rl/spr_jsrl")  # 与 train/spr_jsrl_cfg.py 对齐。
+# 默认对齐 train/spr_jsrl_cfg.py;VAL_OUT_DIR 环境变量可覆盖(phased pipeline 用它指到
+# spr_phased_* 目录复用本 val)。默认值不变,JSRL 线的 val 不受影响。
+OUT_DIR = Path(os.environ.get("VAL_OUT_DIR", "./models/rl/spr_jsrl"))
 RANDOM_STOP_OUT_DIR = Path("./models/rl/spr_jsrl_random_stop")
 
 NUM_ENVS = 32  # 离线 val 默认并行环境数量;64 会在 val 启动时内存崩溃。

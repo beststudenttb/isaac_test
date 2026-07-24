@@ -282,6 +282,11 @@ def val(
             for t in range(steps):
                 obs_in = spr.encode(image).float() if spr is not None else image
                 action = agent.act(obs_in, goal, sigma=0.0, eval_mode=True)
+                # env.step() 内部对 done 的 env 调 _reset_idx() → sample_end_state() 重抽 end_d/end_x。
+                # last_dist/last_px_x 是 reset 前的值,必须配 reset 前的目标一起算,否则量的是
+                # "本集达成位置 vs 下一集的新目标"(random_stop 下伪影约 13px / 0.17m)。
+                step_end_d = env.end_d.clone()
+                step_end_x = env.end_x.clone()
                 _obs, reward, terminated, truncated, _info = env.step(action)
                 active = ~done_once
                 returns[active] += reward[active]
@@ -301,8 +306,8 @@ def val(
                     success[done] = env.last_success[done]
                     fail[done] = env.last_fail[done]
                     timeout[done] = env.last_timeout[done] | truncated[done]
-                    final_de[done] = (env.last_dist - env.end_d).abs()[done]
-                    final_xe[done] = (env.last_px_x - (cx + env.end_x)).abs()[done]
+                    final_de[done] = (env.last_dist - step_end_d).abs()[done]
+                    final_xe[done] = (env.last_px_x - (cx + step_end_x)).abs()[done]
                     done_once[done] = True
                     if bool(done_once.all()):
                         break

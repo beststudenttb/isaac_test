@@ -3,13 +3,14 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-STUDENT_ENVS="${STUDENT_ENVS:-32}"
-VAL_ENVS="${VAL_ENVS:-32}"
+# spr_z 模式冻结 encoder + 不存图(见 src/replay.py store_images),128 env 也只占 ~0.5GB buffer。
+STUDENT_ENVS="${STUDENT_ENVS:-128}"
+VAL_ENVS="${VAL_ENVS:-128}"
 VAL_EPISODES="${VAL_EPISODES:-1}"
 VAL_START="${VAL_START:-0}"
 VAL_STRIDE="${VAL_STRIDE:-1}"
 OBS_MODE="${OBS_MODE:-spr_z}"
-RANDOM_STOP="${RANDOM_STOP:-0}"
+RANDOM_STOP="${RANDOM_STOP:-1}"
 NOISE="${NOISE:-1}"
 # Physical GPU for this pipeline. Isaac Sim's usdrt scenegraph only supports
 # cuda:0, so we hide other GPUs via CUDA_VISIBLE_DEVICES instead of --device cuda:N.

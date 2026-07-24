@@ -15,9 +15,9 @@ OBS_MODE = "spr_z"  # "spr_z"(冻结 SPR z + goal) 或 "pixels"(DrQ-v2 原版:�
 SPR_CKPT = Path("./models/rl/_encoders/stage1_sigma_ablation.pt")
 
 NUM_ENVS = 32  # 并行环境数量。
-TOTAL_ENV_STEPS = 2_000_000  # 总采样 env 步数(所有 env 合计)。
+TOTAL_ENV_STEPS = 4_000_000  # 总采样 env 步数(所有 env 合计);2M 收官时离线曲线仍是正斜率(76.6% 且还在涨),加倍看能到哪。
 SEED_STEPS = 4000  # 前多少 env 步用均匀随机动作填 buffer(也是学习 warmup)。
-UPDATES_PER_TICK = 4  # 每个采集 tick 做多少次梯度更新;吞吐由 P1 烟测后再调。
+UPDATES_PER_TICK = 64  # 每个采集 tick 做多少次梯度更新;128 env 下 replay ratio=64*256/128=128,与 arm B(pixels,32 env)一致;总更新 15625tick*64=1M,也与 pixels 对齐。
 EPISODE_S = 15.0  # 单个 episode 最长仿真时间，单位秒。
 STOP_N = 1  # 训练时 stop 一次即 success。
 SEED = 1  # 随机种子。

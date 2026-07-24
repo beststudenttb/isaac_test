@@ -32,7 +32,8 @@ class JSRLCurriculum:
 
     离散阶梯:课程档位 = f * h_base,f ∈ {0, 1/n, …, (n-1)/n}(n=n_rungs)。h 是交棒步数上限。
     索引 n-1 = f 最大 = teacher 帮最多(起手);索引 0 = f=0 = h=0 = teacher 全退。学得动降一档
-    (f 更小、teacher 更少),学不动回一档。固定步长的阶梯比乘性衰减干净,不会一步跨过断崖。
+    (f 更小、teacher 更少)。**本版禁用回火:课程只进不退,学不动就原地 HOLD**(实验:看 student
+    能自己爬到哪一档)。固定步长的阶梯比乘性衰减干净,不会一步跨过断崖。
     """
 
     def __init__(
@@ -72,8 +73,8 @@ class JSRLCurriculum:
         old = self.idx
         if self.ema > self.up_thresh:
             self.idx = max(self.idx - 1, 0)               # 学得动 -> 降一档(f 更小,teacher 更少)
-        elif self.ema < self.down_thresh:
-            self.idx = min(self.idx + 1, self.n_rungs - 1)  # 学不动 -> 回一档
+        # 回火已禁用(实验):课程只进不退,学不动就原地 HOLD,给 student 在该档充分时间巩固,
+        # 避免"某档刚切过去、还没学会前进就因成功率骤降被拉回易档"。down_thresh 此版不使用。
         if self.idx != old:
             self.h = self.fractions[self.idx] * self.h_base
             self.cooldown = self.cooldown_len

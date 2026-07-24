@@ -334,6 +334,7 @@ def main() -> None:
         z_dim=z_dim,
         n_step=int(cfg.N_STEP),
         gamma=float(cfg.GAMMA),
+        store_images=(mode == "pixels"),  # spr_z 只用 z,不存图 → 128 env 才放得下。
     )
 
     def encode_z(images: torch.Tensor) -> torch.Tensor | None:
@@ -433,8 +434,9 @@ def main() -> None:
                 row = {
                     "tick": tick,
                     "step": global_step,
-                    "fps": f"{steps_window / elapsed:.1f}",
-                    "sample_fps": f"{steps_window / max(win['collect_s'], 1e-9):.1f}",
+                    # fps/sample_fps = 仿真步/秒(每秒 env.step 次数,不乘 env 数)
+                    "fps": f"{int(cfg.LOG_EVERY_TICKS) / elapsed:.1f}",
+                    "sample_fps": f"{int(cfg.LOG_EVERY_TICKS) / max(win['collect_s'], 1e-9):.1f}",
                     "collect_s": f"{win['collect_s']:.3f}",
                     "learn_s": f"{win['learn_s']:.3f}",
                     "done": int(win["done"]),
