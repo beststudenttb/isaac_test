@@ -90,6 +90,8 @@ SPR 当前实现状态：
 - **critic 友好度实验证实是信用分配、不是表征**：同一批 teacher 数据 + 同一 [64,64] MLP，监督拟合折扣回报 R² 里 SPR z（0.84）> MDP/oracle（0.78）——z 对 critic 最友好；但 TD(0) 连 oracle 都学不出，n=17（GAE 视野）才逼近上界。稀疏终止奖励 on-policy 撞一次用一次、只传 17 步，off-policy replay 反复回放整条轨迹——这才是 100% vs 0% 的机制。
 - **JSRL + 反向课程（on-policy）是「课程救不了 σ 病」的反面证据**：同一个 z，课程让 success 从 0 爬到 62.5% 就卡死，`a_w`（转头维）σ 顶死 0.3 clamp；课程解决了"走到区"、解决不了"精确对准"。
 - off-policy 线三个满分级结果：DrQ-v2 干净版 97.7%、noise 版 99.2%、arm A（冻结 SPR z）100%，均已归档。
+- **（07-22~24）两臂对照做实 + 度量 bug**：arm A（冻结 SPR z）random_stop 上 2M 步 76.6% → **4M 步 92.2%**（此前低分是 128 env 下 `UPDATES_PER_TICK` 仍为 16、replay ratio 掉到 32 的欠训，非表征问题）；arm B（pixels）同任务仅 **28% 且已收敛**（峰值 1.44M 后退化，timeout 69%、xe 18px），构成"只换表征"的单变量对照。**注意 pixels 在固定任务上的 99% 不能算作"会用 goal"的证据**——固定任务下 goal 是常量 `(0.1875, 0)`，被第一层线性当偏置吸收；有区分度的只有 random_stop。**度量 bug**：`sb3_env._reset_idx` 在 episode 结束时重采样 `end_x/end_d`，而 val 在 `env.step` 之后才读 → `final_xe/de` 量的是"本集达成位置 vs 下一集新目标"（random_stop 下伪影约 13px/0.17m）。已修并回填归档；**凡 `RANDOM_STOP=True` 的历史数字都要确认是否修正过**。详见 `summary/handoff_2026_07_24.md`。
+- **（07-23）任务升级到"要先找球"**：`task_cfg.ANGLE_DEG` 45→60（张角 120°，相机 FOV 仅 80°），盲区开局占比 3%→33%，搜索从边缘情况变成常态。±60° 训练后 93.75%，盲区子集 67.4%→83.7%。**未解决**：盲区里 `a_w` 换向 49 次/集、耗时 72 步 vs 理论最优 39 步，是原地摇头不是单向扫描；假设是 `K_SEARCH_W=0.01` 让摇头成了正收益解（`k_time` 被 `seen` 门住，盲区无时间压力），支持证据是古老的 `drq_env/task_cfg.py` 没有该项、那时能学会单向转。
 - **（07-17）JSRL 初始化修复 + 停止微调判决**：查出 SPR-PPO 失败还有一层是 **actor 末层默认 Kaiming 初始化**（末尾无 tanh 居中）→ 初始 `μ_y≈+0.12` 漂移；`train/spr_jsrl.py` 加末层小增益初始化（`weight*0.01 + bias=0`，纯局部不碰共享框架）后初始 μ≈0。修后 a_y 的 σ 收到 0.042，但 **σ 病搬到 a_x/a_w（精度维顶死 0.1 clamp）**；崩点轨迹 = student 独扛接近段后**过冲**（dist 1.1<1.5 穿过停车带）；课程控制器另有病（进档靠 teacher 灌水的 ema、回火级联每档只待 cooldown 11 步不巩固）。h=60 给 293 update 仍卡 0.66。**结论：课程+初始化治不了精确刹停/对准（稀疏终止信用传不到精度维），停止微调 JSRL，重心转世界模型（Dreamer/TD-MPC on SPR latent）。** 详见 `summary/2026_07_17_ubuntu.md`。
 
 当前目录约定：
@@ -102,7 +104,8 @@ SPR 当前实现状态：
 - `models/` 放训练现场输出，不上传 Git。
 - `approved_models/` 放确认保留的模型和说明，需要上传 Git。
 - `approved_models/` 中每个确认实验应尽量自包含：policy、teacher、视觉预训练、MDP/SPR checkpoint、配置和 trajectory 都要能复现。
-- 最新确认归档（off-policy 线）：`approved_models/2026_07_14_drqv2_pixels/`（干净 97.7%）、`2026_07_16_drqv2_noise/`（noise 99.2%）、`2026_07_16_spr_jsrl/`（PPO+课程反面结果 62.5%）；arm A（冻结 SPR z + DrQ-v2，离线 100%）在 `models/rl/drq_student_spr/`，待归档。SPR-PPO 反面对照：`2026_07_13_spr_student_bc1`、`2026_07_14_spr_teacher5`。
+- 最新确认归档（off-policy 线）：`approved_models/2026_07_14_drqv2_pixels/`（干净 97.7%）、`2026_07_16_drqv2_noise/`（noise 99.2%）、`2026_07_16_spr_jsrl/`（PPO+课程反面结果 62.5%）。SPR-PPO 反面对照：`2026_07_13_spr_student_bc1`、`2026_07_14_spr_teacher5`。
+- **（07-24 起）归档格式改为 `approved_models/_release/` 下的 eval zip**：原目录含 >100MB 单文件超 GitHub 硬限制，改为 **SRL(encoder) / RL(actor) / critic 三分**，eval 包只含前两者（推理不需要 critic）。三次 spr 跑共用同一份 `spr_encoder_cfd52c0f.pt`（md5 全同），故各包仅 4.5MB。原归档目录与 `*_critic.pt` 留在服务器并 gitignore。zip 内 `HOWTO.md` 说明如何把共用 encoder 配回去跑 val。配套：`src/drqv2.py` 的 `load_dict` 放宽 critic 为可选（与 `src/drqv2_agent.py` 既有约定一致）。
 - `summary/` 放规则、项目状态、TODO 和每日总结。
 - `data_isaac/` 放本地生成数据，不上传 Git。
 

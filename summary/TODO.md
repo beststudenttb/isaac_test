@@ -5,10 +5,19 @@
 - **在冻结/共学习 SPR latent 上起 Dreamer / TD-MPC 骨架**：model-based off-policy = 样本效率天花板，直指 Regime B（实机、少样本、逐次适应）。**用现成 repo（dreamerv3 / SheepRL）接 Isaac 向量化 env，别从零手写**（几天工作量，非过夜盲挂）。见记忆 `research-direction-and-strategy`。
 - 定位：把"感知（表征）+ 决策（策略）"统一进一个学习对象（world model 正是这一体）。这是 Master 论文的天花板线；off-policy 机制论文是地板。
 
+## SPR 共适应线（spr_coadapt，07-24 起，正在跑）
+
+- **正在 GPU0 跑**：`train/spr_coadapt.py --num-envs 128`，2M 步约 12 小时，输出 `models/rl/spr_coadapt/`。把原文 SPR 范式搬到 off-policy：critic 的 TD 梯度 + SPR 自监督 loss 联合更新同一 encoder（从头联合，ImageNet backbone）。**判据是稳定性不是成功率**。
+- **盯三个探针**：`z_std`（塌向 0 = 表征塌缩）、`spr_loss`、`q1_mean`。截至 07-24 18:27（step 0.5M）：z_std 0.014→0.204（没塌 ✅）、spr_loss 1.99→0.29（在学 ✅）、**`q1_mean` −0.03→20.5（⚠️ 同任务 arm A 稳定在 ~4.3，`R_SUCCESS` 只有 10，疑 Q 高估）**。若 q1 继续单调爬且 critic_loss 同步涨 → Q 发散，旋钮是把 `ENC_LR_RATIO` 从 0.1 再压小。
+- 卖点定位：**不 novel 在"联合训练"**（on-policy 的 `src/spr_ppo.py` 本就是原文范式），novel 在**离策略下这个联合环稳不稳**。
+- 遗留：`BATCH_SIZE` 因显存降到 64（256 实测 OOM），replay ratio 只有 8；`UPDATES_PER_TICK` 不影响峰值显存，要补采样效率可提到 32/64。
+
 ## off-policy 线（DrQ-v2，地板）
 
+- **`K_SEARCH_W → 0` 的搜索效率实验（最便宜、假设最明确）**：±60° 后盲区搜索仍是原地摇头（换向 49 次/集、72 步 vs 理论最优 39 步）。假设是 `K_SEARCH_W=0.01` 让摇头成了正收益解；古老 `drq_env/task_cfg.py` 没这一项且能学会单向转。
+- **补一条 pixels 4M / upt64**：让 arm A（4M/64）vs arm B（2M/16）的对照完全对齐。现在结论已稳（arm A 2M 的 76.6% vs pixels 28% 也压倒性），但要无可挑剔就得补。
 - **arm A 多 seed（优先，便宜）**：冻结同一个 z（`_encoders/stage1_sigma_ablation.pt`）跑 seed 2/3，把 n=1 的 100% 变成 n=3 mean±std。注意现状 seed 写死 cfg、`CLEAR_OUT_DIR=True`，多 seed 需先加 SEED/OUT_DIR 覆盖 + 独立目录，否则清掉已有结果。
-- arm A 归档：`models/rl/drq_student_spr/`（离线 100%）挑 best 存进 `approved_models/`（policy 只含 spr_z，配 `_encoders/stage1_sigma_ablation.pt`）。
+- ~~arm A 归档~~：已完成（07-22/07-23 三次 spr_z 跑已归档到 `approved_models/_release/`，见 `summary/handoff_2026_07_24.md`）。
 
 ## JSRL（on-policy，已判定停止微调 → 归档负结果）
 
