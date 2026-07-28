@@ -10,6 +10,7 @@ VAL_EPISODES="${VAL_EPISODES:-1}"
 VAL_START="${VAL_START:-0}"
 VAL_STRIDE="${VAL_STRIDE:-1}"
 OBS_MODE="${OBS_MODE:-spr_z}"
+CFG="${CFG:-drq_student_cfg}"  # offpolicy.py --cfg 传入的 cfg 模块(spr_z/pixels 用 drq_student_cfg,spr_coadapt 用 spr_coadapt_cfg)。
 RANDOM_STOP="${RANDOM_STOP:-1}"
 NOISE="${NOISE:-1}"
 # Physical GPU for this pipeline. Isaac Sim's usdrt scenegraph only supports
@@ -32,11 +33,13 @@ fi
 
 # Unsetting DISPLAY makes Kit fall back to pure off-screen rendering, which
 # also works on a GPU without a monitor attached (see run_spr_student_pipeline.sh).
-env -u DISPLAY ./IsaacLab/isaaclab.sh -p train/drq_student.py \
+env -u DISPLAY ./IsaacLab/isaaclab.sh -p train/offpolicy.py \
+  --cfg "${CFG}" \
   --num-envs "${STUDENT_ENVS}" \
   "${ARGS[@]}"
 
-env -u DISPLAY ./IsaacLab/isaaclab.sh -p val/drq_student.py \
+env -u DISPLAY ./IsaacLab/isaaclab.sh -p val/offpolicy.py \
+  --cfg "${CFG}" \
   --num-envs "${VAL_ENVS}" \
   --num-episodes "${VAL_EPISODES}" \
   --start "${VAL_START}" \

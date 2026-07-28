@@ -1,5 +1,18 @@
 # TODO
 
+## 代码瘦身
+
+### off-policy（arm A 族，07-27 已完成）
+5 个脚本(1547 行) → `train/offpolicy.py` + `val/offpolicy.py`(543 行) + `src/rl/{agent,buffer,env,logging,spr}.py`。两份 DrQV2Agent/两份 buffer 合一，helper 模块化，CLI `--cfg` 传 cfg 模块(cfg 内容不动，只改 import 方式)。**arm B(drqv2/drqv2_agent/drqv2_buffer/train+val drqv2)按决定保留未动** —— 代价是它的 csv 字段(`frame`/无 `sample_fps`/`z_std`)和 offpolicy 不对齐；哪天要对齐就得动 arm B。
+
+### on-policy（⚠️ 回到这条线前先瘦身，别直接加实验）
+env 是**统一的 IsaacLab 继承链** `BallEnv → BallPPOEnv(sb3_env.py) → MDPStudentEnv → NoiseStudentEnv`，off-policy 和 on-policy 主力共用它(`sb3_env` 这名字误导——它是 IsaacLab DirectRLEnv，不是 gym)。按范式分三族：
+- **SB3 库(teacher)**：`stable_baselines3.PPO` + `make_sb3` gym wrapper。**唯一 env 无法对齐的**(SB3 库要 gym VecEnv 接口)。→ 单独摘到 `train/sb3/` 子目录，别和自写 PPO 混。
+- **自写 PPO(student / student_vision / cnn_student / spr_student / spr_bc / spr_jsrl / spr_phased / mdp_student)**：env 已齐(IsaacLab batched tensor)，但 loop 范式**真不同**(纯 PPO / +teacher BC / +JSRL 反向课程 / phased 分阶段)——是 4 个不同 seam，别硬合成 shallow dispatcher。且大半是死线(JSRL 判停、phased 探路、mdp/cnn/student 早期)。
+- **表征预训练(mdp_state / cv)**：无 env/PPO，纯监督离线数据，另一类。
+
+**建议顺序**：① teacher(SB3)单独摘出去 ② 归档死线(spr_jsrl/spr_phased/mdp_student/cnn_student/student/student_vision 早期)移出主干，这是最大瘦身 ③ 活线只剩 spr_student/spr_bc，别为几条线做大统一。env 继承链本身是好的 deep 结构(层层加语义)，不要动。理由详见与 CC 讨论(2026-07-27，codebase-design skill)。
+
 ## 世界模型线（新重点，07-17 起）
 
 - **在冻结/共学习 SPR latent 上起 Dreamer / TD-MPC 骨架**：model-based off-policy = 样本效率天花板，直指 Regime B（实机、少样本、逐次适应）。**用现成 repo（dreamerv3 / SheepRL）接 Isaac 向量化 env，别从零手写**（几天工作量，非过夜盲挂）。见记忆 `research-direction-and-strategy`。
