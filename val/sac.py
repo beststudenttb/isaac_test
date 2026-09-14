@@ -1,6 +1,7 @@
 """SAC + HER 离线评估入口(与 val/offpolicy.py 结构对齐)。评估动作 = 确定性 tanh(mean)。
 
     ./IsaacLab/isaaclab.sh -p val/sac.py --cfg sac_cfg --obs-mode spr_z --noise
+    ./IsaacLab/isaaclab.sh -p val/sac.py --cfg sac_coadapt_cfg --obs-mode spr_coadapt --noise
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ parser.add_argument("--num-envs", type=int, default=None)
 parser.add_argument("--num-episodes", type=int, default=None)
 parser.add_argument("--start", type=int, default=None)
 parser.add_argument("--stride", type=int, default=None)
-parser.add_argument("--obs-mode", type=str, default="spr_z", choices=["spr_z", "pixels"])
+parser.add_argument("--obs-mode", type=str, default="spr_z", choices=["spr_z", "pixels", "spr_coadapt"])
 parser.add_argument("--random-stop", action="store_true")
 parser.add_argument("--noise", action="store_true")
 AppLauncher.add_app_launcher_args(parser)
@@ -81,6 +82,8 @@ def load_agent(path: Path, device: torch.device) -> SACAgent:
     agent.critic.eval()
     if agent.encoder is not None:
         agent.encoder.eval()
+    if agent.spr is not None:
+        agent.spr.eval()  # co-adapt 的 encoder 带 BN,train() 模式下 val 会漂 running stats
     return agent
 
 

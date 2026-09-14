@@ -6,10 +6,13 @@
 保持随机,zone 内天然能采到低动作;配合 HER(把 goal relabel 到实际到达位置)把这些低动作
 样本组合成 in_zone & a<eps = success 样本喂给 critic,正面破死锁。
 
-两种 obs_mode:
+三种 obs_mode:
 - "spr_z":冻结 SPR encoder 的 z 直接进 trunk(encoder 不在本模块);
-- "pixels":存的 224 图 GPU resize → RandomShiftsAug → 小 CNN(critic 梯度训练,DrQ-v1 风格)。
-不含 spr_coadapt(表征漂移是另一个问题,SAC+HER 先在稳定表征上验证机制)。
+- "pixels":存的 224 图 GPU resize → RandomShiftsAug → 小 CNN(critic 梯度训练,DrQ-v1 风格);
+- "spr_coadapt":ImageNet ResNet18+FPN 的 SPRStateNet 从头联合训练,critic TD 梯度 + λ·K 步 SPR
+  自监督 loss 同时更新 encoder(与 src/rl/agent.py 的 DrQV2Agent spr_coadapt 分支逐行同构)。
+  DDPG 版 co-adapt 2M 全死在冷启动死锁(success≡0),这里换成 SAC+HER 再打一次:死锁若被破,
+  剩下的就是纯表征稳定性问题(z_std 塌不塌 / q 发不发散)。
 """
 
 from __future__ import annotations
@@ -79,25 +82,56 @@ class SACAgent:
         pixels_res: int = 0,
         aug_pad: int = 0,
         spr_z_dim: int = 0,
+        spr_fpn: int = 128,
+        spr_hidden: int = 256,
+        spr_pool: int = 7,
+        spr_tau: float = 0.99,
+        spr_k: int = 0,
+        spr_coef: float = 1.0,
+        enc_lr_ratio: float = 1.0,
         device: torch.device | str = "cuda",
     ):
-        if obs_mode not in ("spr_z", "pixels"):
-            raise ValueError(f"SACAgent 只支持 spr_z / pixels,收到:{obs_mode}")
+        if obs_mode not in ("spr_z", "pixels", "spr_coadapt"):
+            raise ValueError(f"unknown obs_mode: {obs_mode}")
         self.obs_mode = obs_mode
         self.device = torch.device(device)
         self.tau = float(tau)
         self.gamma = float(gamma)
         self.pixels_res = int(pixels_res)
         self.target_entropy = float(target_entropy)
+        self.spr_k = int(spr_k)
+        self.spr_coef = float(spr_coef)
 
         self.encoder = None
         self.encoder_opt = None
         self.aug = None
+        self.spr = None
         if obs_mode == "pixels":
             self.encoder = PixelEncoder(3, self.pixels_res).to(self.device)
             self.aug = RandomShiftsAug(int(aug_pad))
             repr_dim = self.encoder.repr_dim
             self.encoder_opt = torch.optim.Adam(self.encoder.parameters(), lr=lr)
+        elif obs_mode == "spr_coadapt":
+            # 从头联合:ImageNet backbone + 随机 SPR/critic/actor 头。encoder 学习率 = critic 的
+            # enc_lr_ratio 倍(双时间尺度,表征慢),与 DrQV2Agent 的 co-adapt 分支同参。
+            from src.cv_extractor.spr_state import SPRStateNet
+
+            self.spr = SPRStateNet(
+                input_shape=(224, 224, 3),
+                z_dim=int(spr_z_dim),
+                action_dim=int(act_dim),
+                fpn_dim=int(spr_fpn),
+                hidden_dim=int(spr_hidden),
+                pool_size=int(spr_pool),
+                pretrained=True,
+                target_tau=float(spr_tau),
+                freeze_stem_layers=False,
+            ).to(self.device)
+            repr_dim = self.spr.z_dim
+            self.encoder_opt = torch.optim.Adam(
+                [p for p in self.spr.parameters() if p.requires_grad],
+                lr=lr * float(enc_lr_ratio),
+            )
         self.repr_dim = int(repr_dim)
 
         self.actor = StochasticActor(self.repr_dim, goal_dim, act_dim, feature_dim, hidden_dim).to(self.device)
@@ -130,7 +164,24 @@ class SACAgent:
     def obs_repr(self, batch_or_obs, augment: bool) -> torch.Tensor:
         if self.obs_mode == "spr_z":
             return batch_or_obs.to(self.device)
+        if self.obs_mode == "spr_coadapt":
+            return self.spr.encode(batch_or_obs.to(self.device)).float()
         return self.encode_pixels(batch_or_obs, augment=augment)
+
+    def _spr_loss_k(self, z, target_image, actions, mask):
+        """K 步 latent rollout:z 经 transition 迭代 K 步 → 预测,对齐 target_encoder(第 K 帧)。
+        mask=0 的样本(K 段内跨了 episode 边界)不计入。batch-centering 防塌缩(去掉共享 mean,
+        避免常数偏移把 cosine 拉到 1)。与 DrQV2Agent._spr_loss_k 逐行一致。"""
+        with torch.no_grad():
+            target = self.spr.spr_target(self.spr.encode_target(target_image))
+        pred_z = z
+        for i in range(actions.shape[1]):
+            pred_z = self.spr.predict_next(pred_z, actions[:, i])
+        pred = self.spr.spr_pred(pred_z)
+        pred = pred - pred.mean(dim=0, keepdim=True)
+        target = target - target.mean(dim=0, keepdim=True)
+        per = F.mse_loss(F.normalize(pred, dim=1), F.normalize(target, dim=1), reduction="none").sum(dim=1)
+        return (per * mask).sum() / mask.sum().clamp(min=1.0)
 
     @torch.no_grad()
     def act(self, obs, goal: torch.Tensor, eval_mode: bool) -> torch.Tensor:
@@ -149,6 +200,10 @@ class SACAgent:
             repr_ = batch["z"]
             with torch.no_grad():
                 next_repr = batch["next_z"]
+        elif self.obs_mode == "spr_coadapt":
+            repr_ = self.spr.encode(batch["obs"]).float()  # 带梯度:critic + spr_loss 都从这里回传进 encoder
+            with torch.no_grad():
+                next_repr = self.spr.encode(batch["next_obs"]).float()
         else:
             repr_ = self.encode_pixels(batch["obs"], augment=True)
             with torch.no_grad():
@@ -163,10 +218,16 @@ class SACAgent:
 
         q1, q2 = self.critic(repr_, goal, action)
         critic_loss = F.mse_loss(q1, target_q) + F.mse_loss(q2, target_q)
+        total_loss = critic_loss
+        spr_loss_val = 0.0
+        if self.obs_mode == "spr_coadapt":
+            spr_loss = self._spr_loss_k(repr_, batch["spr_target"], batch["spr_actions"], batch["spr_mask"])
+            total_loss = critic_loss + self.spr_coef * spr_loss
+            spr_loss_val = float(spr_loss.detach().cpu())
         if self.encoder_opt is not None:
             self.encoder_opt.zero_grad(set_to_none=True)
         self.critic_opt.zero_grad(set_to_none=True)
-        critic_loss.backward()
+        total_loss.backward()
         self.critic_opt.step()
         if self.encoder_opt is not None:
             self.encoder_opt.step()
@@ -185,9 +246,11 @@ class SACAgent:
         self.alpha_opt.step()
 
         soft_update(self.critic_target, self.critic, self.tau)
+        if self.obs_mode == "spr_coadapt":
+            self.spr.update_target()
         with torch.no_grad():
             a_mag = a.abs().max(dim=-1).values.mean()
-        return {
+        metrics = {
             "critic_loss": float(critic_loss.detach().cpu()),
             "actor_loss": float(actor_loss.detach().cpu()),
             "q1_mean": float(q1.detach().mean().cpu()),
@@ -196,6 +259,10 @@ class SACAgent:
             "entropy": float((-logp).detach().mean().cpu()),
             "a_mag_batch": float(a_mag.cpu()),
         }
+        if self.obs_mode == "spr_coadapt":
+            metrics["spr_loss"] = spr_loss_val
+            metrics["z_std"] = float(repr_.detach().std(dim=0).mean().cpu())  # 表征坍缩探针:→0 即塌
+        return metrics
 
     def save_dict(self) -> dict:
         out = {
@@ -207,6 +274,8 @@ class SACAgent:
         }
         if self.encoder is not None:
             out["encoder"] = self.encoder.state_dict()
+        if self.spr is not None:
+            out["spr"] = self.spr.state_dict()
         return out
 
     def load_dict(self, ckpt: dict) -> None:
@@ -220,3 +289,5 @@ class SACAgent:
                 self.log_alpha.copy_(ckpt["log_alpha"].to(self.device))
         if self.encoder is not None:
             self.encoder.load_state_dict(ckpt["encoder"])
+        if self.spr is not None:
+            self.spr.load_state_dict(ckpt["spr"])

@@ -25,6 +25,8 @@ parser = argparse.ArgumentParser(description="Train PPO student with SPR visual 
 parser.add_argument("--num-envs", type=int, default=None)
 parser.add_argument("--random-stop", action="store_true")
 parser.add_argument("--noise", action="store_true")
+parser.add_argument("--hover", action="store_true",
+                    help="任务 v2:悬停 env(只给状态分、无提前终止),输出目录加 _hover 后缀")
 parser.add_argument("--show", action="store_true")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
@@ -51,6 +53,12 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src import task_cfg
 from src.cv_extractor.spr_state import SPRStateNet
+from src.hover_env import (
+    HoverNoiseStudentEnvCfg,
+    HoverStudentEnvCfg,
+    make_hover_noise_student_env,
+    make_hover_student_env,
+)
 from src.mdp_student_env import MDPStudentEnv, MDPStudentEnvCfg, make_mdp_student_env
 from src.noise_env import NoiseStudentEnvCfg, make_noise_student_env
 from src.spr_ppo import SPRActorCritic, SPRRollout, spr_diagnostics, spr_only_update, spr_ppo_update
@@ -153,6 +161,8 @@ VAL_FIELDS = [
 
 def out_dir() -> Path:
     path = Path(cfg.RANDOM_STOP_OUT_DIR) if args_cli.random_stop else Path(cfg.OUT_DIR)
+    if args_cli.hover:
+        path = path.with_name(path.name + "_hover")
     if bool(cfg.CLEAR_OUT_DIR) and path.exists():
         shutil.rmtree(path)
     path.mkdir(parents=True, exist_ok=True)
@@ -188,6 +198,7 @@ def write_config(path: Path) -> None:
             lines.append(f"{name} = {getattr(cfg, name)!r}")
     lines.append(f"RANDOM_STOP = {bool(args_cli.random_stop)!r}")
     lines.append(f"NOISE = {bool(args_cli.noise)!r}")
+    lines.append(f"HOVER = {bool(args_cli.hover)!r}")
     lines.append(f"TEACHER_PATH_USED = {teacher_path()!r}")
     lines.append(f"DEVICE_USED = {args_cli.device!r}")
     (path / "config.py").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -202,7 +213,10 @@ def open_csv(path: Path, fields: list[str]):
 
 def make_env() -> MDPStudentEnv:
     end_d_min, end_d_max, end_x_min, end_x_max = end_range()
-    env_cfg = NoiseStudentEnvCfg() if args_cli.noise else MDPStudentEnvCfg()
+    if args_cli.hover:
+        env_cfg = HoverNoiseStudentEnvCfg() if args_cli.noise else HoverStudentEnvCfg()
+    else:
+        env_cfg = NoiseStudentEnvCfg() if args_cli.noise else MDPStudentEnvCfg()
     env_cfg.seed = int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
     env_cfg.stop_n = int(cfg.STOP_N)
@@ -221,7 +235,10 @@ def make_env() -> MDPStudentEnv:
     env_cfg.end_d_max = end_d_max
     env_cfg.end_x_min = end_x_min
     env_cfg.end_x_max = end_x_max
-    make_env_fn = make_noise_student_env if args_cli.noise else make_mdp_student_env
+    if args_cli.hover:
+        make_env_fn = make_hover_noise_student_env if args_cli.noise else make_hover_student_env
+    else:
+        make_env_fn = make_noise_student_env if args_cli.noise else make_mdp_student_env
     return make_env_fn(env_cfg)
 
 
@@ -510,6 +527,10 @@ def main() -> None:
     # 看起来像是"在跑但没输出"(07-14 踩过)。
     if teacher_required() and not Path(teacher_path()).exists():
         raise FileNotFoundError(f"teacher model not found: {teacher_path()}")
+    if args_cli.hover and int(cfg.VAL_EVERY) > 0:
+        # 悬停 env 无终止,训练内 val 的 success 判据无意义;hover 的评估走 val/spr_student.py --hover
+        # (v1 env + 切断 wrapper)。
+        raise ValueError("--hover 时 VAL_EVERY 必须为 0")
 
     env = make_env()
     device = torch.device(env.device)

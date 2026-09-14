@@ -28,6 +28,9 @@ parser.add_argument("--start", type=int, default=int(cfg.START))
 parser.add_argument("--stride", type=int, default=int(cfg.STRIDE))
 parser.add_argument("--random-stop", action="store_true")
 parser.add_argument("--noise", action="store_true")
+parser.add_argument("--hover", action="store_true",
+                    help="评估 _hover 目录的悬停策略:env 仍是 v1(终止/判据同 88%/92% 可比),"
+                         "外套切断 wrapper——连续在区 HOVER_CUT_N 步后动作强制置 0")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -106,7 +109,10 @@ TRAJ_FIELDS = [
 
 
 def root_dir() -> Path:
-    return Path(cfg.RANDOM_STOP_OUT_DIR) if args_cli.random_stop else Path(cfg.OUT_DIR)
+    path = Path(cfg.RANDOM_STOP_OUT_DIR) if args_cli.random_stop else Path(cfg.OUT_DIR)
+    if args_cli.hover:
+        path = path.with_name(path.name + "_hover")
+    return path
 
 
 def end_range() -> tuple[float, float, float, float]:
@@ -288,10 +294,18 @@ def val(
             timeout = torch.zeros(env.num_envs, device=env.device, dtype=torch.bool)
             final_de = torch.zeros(env.num_envs, device=env.device)
             final_xe = torch.zeros(env.num_envs, device=env.device)
+            zone_streak = torch.zeros(env.num_envs, device=env.device, dtype=torch.long)
 
             for t in range(steps):
                 action = model.predict(image, goal)
+                if args_cli.hover:
+                    # 切断 wrapper:连续在区 HOVER_CUT_N 步 → 动作强制 0,
+                    # 由 v1 env 自己的 in_zone & a<eps 判据触发 success(与非 hover 线同判据)。
+                    zone_streak = torch.where(env.in_stop_zone(), zone_streak + 1, torch.zeros_like(zone_streak))
+                    action = action.clone()
+                    action[zone_streak >= int(cfg.HOVER_CUT_N)] = 0.0
                 _obs, reward, terminated, truncated, _info = env.step(action)
+                zone_streak[terminated | truncated] = 0
                 active = ~done_once
                 returns[active] += reward[active]
                 lengths[active] += 1
@@ -355,6 +369,8 @@ def best_key(row: dict) -> tuple:
 def write_config(path: Path, env: MDPStudentEnv):
     lines = [
         "run_name = 'spr_student'",
+        f"hover = {bool(args_cli.hover)!r}",
+        f"hover_cut_n = {int(cfg.HOVER_CUT_N)!r}",
         f"spr_ckpt = {str(cfg.SPR_CKPT)!r}",
         f"num_envs = {env.num_envs!r}",
         f"num_episodes = {int(args_cli.num_episodes)!r}",

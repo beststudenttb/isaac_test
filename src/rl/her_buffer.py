@@ -124,13 +124,18 @@ class HERReplayBuffer:
         self.ptr = (p + 1) % self.capacity
         self.size = min(self.size + 1, self.capacity)
 
-    def sample(self, batch_size: int, device: torch.device, with_images: bool = True) -> dict[str, torch.Tensor]:
-        if self.size <= 2:
-            raise ValueError(f"buffer too small to sample: size={self.size}")
+    def sample(self, batch_size: int, device: torch.device, with_images: bool = True,
+               spr_k: int = 0) -> dict[str, torch.Tensor]:
+        """spr_k>0(co-adapt):额外返回 spr_target(起点后第 k 帧图)、spr_actions[B,K,act]、
+        spr_mask[B](整段 [r0,r0+K) 无 terminated/truncated 才为 1),语义与 buffer.ReplayBuffer 一致。
+        起点图直接复用 obs。"""
+        horizon = max(1, int(spr_k))
+        if self.size <= horizon + 1:
+            raise ValueError(f"buffer too small to sample: size={self.size} horizon={horizon}")
         T = self.capacity
         H = self.future_h
-        # a 需要 r0-1(prev)与 r0+1(next)都在有效区内。
-        max_a = self.size - 2
+        # a 需要 r0-1(prev)与 r0+horizon(next / spr target)都在有效区内。
+        max_a = self.size - 1 - horizon
         base = self.ptr if self.size == T else 0
         a = torch.randint(1, max_a + 1, (batch_size,))
         e = torch.randint(0, self.num_envs, (batch_size,))
@@ -198,4 +203,16 @@ class HERReplayBuffer:
                 next_z[trunc0] = self.term_z[slot_sel[trunc0]]
             batch["z"] = z.to(device)
             batch["next_z"] = next_z.to(device)
+        if spr_k > 0:
+            if self.images is None:
+                raise RuntimeError("spr_k>0 需要 store_images=True")
+            spr_actions = torch.stack([self.actions[(r0 + k) % T, e] for k in range(spr_k)], dim=1)
+            spr_target = self.images[(r0 + spr_k) % T, e]
+            spr_valid = torch.ones(batch_size, dtype=torch.bool)
+            for k in range(spr_k):
+                row = (r0 + k) % T
+                spr_valid = spr_valid & ~(self.terminated[row, e] | self.truncated[row, e])
+            batch["spr_actions"] = spr_actions.to(device)
+            batch["spr_target"] = spr_target.to(device)
+            batch["spr_mask"] = spr_valid.float().to(device)
         return batch

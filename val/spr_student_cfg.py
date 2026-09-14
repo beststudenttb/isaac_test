@@ -7,6 +7,8 @@ OUT_DIR = Path("./models/rl/spr_student")  # SPR student 输出目录(与 train 
 RANDOM_STOP_OUT_DIR = Path("./models/rl/spr_student_random_stop")  # --random-stop 时的输出目录。
 SPR_CKPT = "stage1_end.pt"  # ppo_*.pt 配对的 SPR 来源(阶段1最后一档,固定规则);full_*.pt 自带 SPR。
 
+HOVER_CUT_N = 3  # --hover 切断 wrapper:连续在区多少步后把动作强制置 0(部署侧停止规则)。
+
 NUM_ENVS = 32  # 离线 val 默认并行环境数量;64 会在 val 启动时内存崩溃。
 NUM_EPISODES = 1  # 每个 checkpoint 跑多少轮 env。
 START = 0  # 从哪个 update 开始验证。

@@ -3,25 +3,23 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-# SAC + HER off-policy 流水线:train/sac.py 训完接 val/sac.py 评估。
-# 逻辑与 scripts/run_drq_student_pipeline.sh 对齐,只是算法换 SAC、buffer 换 HER。
-# 三个 obs_mode:spr_z(冻结 z)/ pixels(可训 CNN)/ spr_coadapt(SPR 与 RL 同步训练)。
-# 默认固定任务(RANDOM_STOP=0)。
+# SAC + HER + SPR 共适应流水线:train/sac.py(--obs-mode spr_coadapt)训完接 val/sac.py 评估。
+# 与 scripts/run_sac_pipeline.sh 同一套 train/val 脚本,只是 cfg 换成 sac_coadapt_cfg
+# (encoder 参数抄 spr_coadapt_cfg、算法参数抄 sac_cfg,双单变量对照)。
 #
-# 两张卡分别启动(各开一个 tmux):
-#   GPU=0 OBS_MODE=pixels STUDENT_ENVS=64  ./scripts/run_sac_pipeline.sh
-#   GPU=1 OBS_MODE=spr_z  STUDENT_ENVS=128 ./scripts/run_sac_pipeline.sh
-# spr_coadapt(SPR 与 RL 同步训练)走同一套 train/val 脚本,但 cfg/默认值不同,
-# 单独一个入口:scripts/run_sac_coadapt_pipeline.sh
-STUDENT_ENVS="${STUDENT_ENVS:-64}"
+# 一张卡启动(开 tmux):
+#   GPU=0 ./scripts/run_sac_coadapt_pipeline.sh
+# 冒烟(8 env / 2000 步,几分钟走完全链路后自然退出,产物落 models/rl/sac_coadapt_smoke):
+#   GPU=0 CFG=sac_coadapt_smoke_cfg STUDENT_ENVS=8 VAL_ENVS=8 ./scripts/run_sac_coadapt_pipeline.sh
+STUDENT_ENVS="${STUDENT_ENVS:-64}"  # 存图 64x4096x224x224x3 ≈ 39GB RAM。
 VAL_ENVS="${VAL_ENVS:-128}"
 VAL_EPISODES="${VAL_EPISODES:-1}"
 VAL_START="${VAL_START:-0}"
 VAL_STRIDE="${VAL_STRIDE:-1}"
-OBS_MODE="${OBS_MODE:-spr_z}"
-CFG="${CFG:-sac_cfg}"
+OBS_MODE="${OBS_MODE:-spr_coadapt}"
+CFG="${CFG:-sac_coadapt_cfg}"
 RANDOM_STOP="${RANDOM_STOP:-0}"  # 先跑固定任务;=1 则随机 stop。
-NOISE="${NOISE:-1}"              # 与 arm A(92%)同条件,带干扰球。
+NOISE="${NOISE:-1}"              # 与 spr_coadapt(DDPG 对照)同条件,带干扰球。
 # Physical GPU for this pipeline. Isaac Sim's usdrt scenegraph only supports
 # cuda:0, so we hide other GPUs via CUDA_VISIBLE_DEVICES instead of --device cuda:N.
 GPU="${GPU:-0}"

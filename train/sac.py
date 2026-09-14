@@ -2,8 +2,10 @@
 
     ./IsaacLab/isaaclab.sh -p train/sac.py --cfg sac_cfg --obs-mode spr_z --noise
     ./IsaacLab/isaaclab.sh -p train/sac.py --cfg sac_cfg --obs-mode pixels --noise
+    ./IsaacLab/isaaclab.sh -p train/sac.py --cfg sac_coadapt_cfg --noise   # SPR 与 RL 同步训练
 
-只支持 spr_z / pixels(不含 spr_coadapt)。采集时额外存每步 cur_px/cur_dist/fail 供 HER relabel。
+三个 obs_mode 与 train/offpolicy.py 一致(spr_z / pixels / spr_coadapt),差别都收在 agent 与
+buffer 里。采集时额外存每步 cur_px/cur_dist/fail 供 HER relabel。
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ from isaaclab.app import AppLauncher
 parser = argparse.ArgumentParser(description="SAC + HER off-policy training.")
 parser.add_argument("--cfg", type=str, required=True)
 parser.add_argument("--num-envs", type=int, default=None)
-parser.add_argument("--obs-mode", type=str, default=None, choices=["spr_z", "pixels"])
+parser.add_argument("--obs-mode", type=str, default=None, choices=["spr_z", "pixels", "spr_coadapt"])
 parser.add_argument("--random-stop", action="store_true")
 parser.add_argument("--noise", action="store_true")
 parser.add_argument("--show", action="store_true")
@@ -59,8 +61,11 @@ SAC_LOG_FIELDS = [
     "done", "success", "fail", "timeout",
     "success_rate", "fail_rate", "timeout_rate",
     "critic_loss", "actor_loss", "q1_mean", "q_target_mean", "alpha", "entropy",
+    "spr_loss", "z_std",  # 仅 spr_coadapt 有值,其余模式恒 0(与 logging.LOG_FIELDS 同约定)
     "a_mag_mean", "stop_frac", "zone_frac", "buffer_frames", "updates",
 ]
+SAC_METRIC_KEYS = ("critic_loss", "actor_loss", "q1_mean", "q_target_mean",
+                   "alpha", "entropy", "spr_loss", "z_std")
 
 
 def obs_mode() -> str:
@@ -89,7 +94,7 @@ def write_config(path: Path) -> None:
 
 
 def agent_cfg_dict(repr_dim: int, mode: str) -> dict:
-    return {
+    d = {
         "obs_mode": mode, "repr_dim": int(repr_dim), "goal_dim": 2, "act_dim": 3,
         "feature_dim": int(cfg.FEATURE_DIM), "hidden_dim": int(cfg.HIDDEN_DIM),
         "lr": float(cfg.LR), "tau": float(cfg.TAU), "gamma": float(cfg.GAMMA),
@@ -97,6 +102,13 @@ def agent_cfg_dict(repr_dim: int, mode: str) -> dict:
         "target_entropy": float(cfg.TARGET_ENTROPY),
         "pixels_res": int(cfg.PIXELS_RES), "aug_pad": int(cfg.AUG_PAD),
     }
+    if mode == "spr_coadapt":
+        d.update(
+            spr_z_dim=int(cfg.SPR_Z_DIM), spr_fpn=int(cfg.SPR_FPN), spr_hidden=int(cfg.SPR_HIDDEN),
+            spr_pool=int(cfg.SPR_POOL), spr_tau=float(cfg.SPR_TAU), spr_k=int(cfg.SPR_K),
+            spr_coef=float(cfg.SPR_COEF), enc_lr_ratio=float(cfg.ENC_LR_RATIO),
+        )
+    return d
 
 
 def save_ckpt(path: Path, agent, agent_cfg: dict, mode: str, step: int) -> None:
@@ -133,7 +145,8 @@ def main() -> None:
     agent_cfg = agent_cfg_dict(z_dim, mode)
     agent = SACAgent(**agent_cfg, device=device)
     image_shape = (int(task_cfg.IMAGE_HEIGHT), int(task_cfg.IMAGE_WIDTH), 3)
-    store_images = (mode == "pixels")
+    store_images = (mode in ("pixels", "spr_coadapt"))
+    spr_k = int(cfg.SPR_K) if mode == "spr_coadapt" else 0
     buffer = HERReplayBuffer(
         capacity_per_env=int(cfg.CAPACITY_PER_ENV), num_envs=env.num_envs, image_shape=image_shape,
         goal_dim=2, act_dim=3, z_dim=z_dim, gamma=float(cfg.GAMMA), store_images=store_images,
@@ -207,10 +220,11 @@ def main() -> None:
             z_t = encode_z(image_t)
             win["collect_s"] += time.perf_counter() - collect_start
 
-            if global_step >= int(cfg.SEED_STEPS) and buffer.size > 2:
+            if global_step >= int(cfg.SEED_STEPS) and buffer.size > max(spr_k, 1) + 1:
                 learn_start = time.perf_counter()
                 for _ in range(int(cfg.UPDATES_PER_TICK)):
-                    batch = buffer.sample(int(cfg.BATCH_SIZE), device, with_images=store_images)
+                    batch = buffer.sample(int(cfg.BATCH_SIZE), device,
+                                          with_images=store_images, spr_k=spr_k)
                     metrics = agent.update(batch)
                     for key, value in metrics.items():
                         metric_sums[key] = metric_sums.get(key, 0.0) + value
@@ -225,8 +239,7 @@ def main() -> None:
             if tick % int(cfg.LOG_EVERY_TICKS) == 0:
                 steps_window = int(cfg.LOG_EVERY_TICKS) * env.num_envs
                 elapsed = max(win["collect_s"] + win["learn_s"], 1e-9)
-                m = {k: (metric_sums.get(k, 0.0) / max(metric_count, 1))
-                     for k in ("critic_loss", "actor_loss", "q1_mean", "q_target_mean", "alpha", "entropy")}
+                m = {k: (metric_sums.get(k, 0.0) / max(metric_count, 1)) for k in SAC_METRIC_KEYS}
                 row = {
                     "tick": tick, "step": global_step,
                     "fps": f"{int(cfg.LOG_EVERY_TICKS) / elapsed:.1f}",
@@ -240,6 +253,7 @@ def main() -> None:
                     "critic_loss": f"{m['critic_loss']:.5f}", "actor_loss": f"{m['actor_loss']:.5f}",
                     "q1_mean": f"{m['q1_mean']:.4f}", "q_target_mean": f"{m['q_target_mean']:.4f}",
                     "alpha": f"{m['alpha']:.5f}", "entropy": f"{m['entropy']:.4f}",
+                    "spr_loss": f"{m['spr_loss']:.5f}", "z_std": f"{m['z_std']:.5f}",
                     "a_mag_mean": f"{win['a_mag'] / steps_window:.4f}",
                     "stop_frac": f"{win['stop'] / steps_window:.4f}",
                     "zone_frac": f"{win['zone'] / steps_window:.4f}",
@@ -248,7 +262,7 @@ def main() -> None:
                 log_writer.writerow(row)
                 log_file.flush()
                 traj_file.flush()
-                for key in ("critic_loss", "actor_loss", "q1_mean", "q_target_mean", "alpha", "entropy"):
+                for key in SAC_METRIC_KEYS:
                     tb.add_scalar(f"train/{key}", m[key], global_step)
                 tb.add_scalar("train/success_rate", win["success"] / max(win["done"], 1), global_step)
                 tb.add_scalar("train/stop_frac", win["stop"] / steps_window, global_step)
@@ -264,6 +278,7 @@ def main() -> None:
                         ("updates", int(win["updates"])), ("critic_loss", m["critic_loss"]),
                         ("actor_loss", m["actor_loss"]), ("q1_mean", m["q1_mean"]),
                         ("alpha", m["alpha"]), ("entropy", m["entropy"]),
+                        ("spr_loss", m["spr_loss"]), ("z_std", m["z_std"]),
                     ]),
                 ])
                 win = {k: 0.0 for k in win}
