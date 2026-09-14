@@ -35,3 +35,9 @@ approved_models/2026_07_22_drq_student_spr_z_4m/
 approved_models/2026_07_23_drq_student_spr_z_angle60/
 approved_models/2026_07_23_drqv2_pixels_random_stop/
 approved_models/_release/*_critic.pt
+
+# 采集的数据集(图片已被 *.png 挡住,这里挡住 transitions.csv)
+data_score_*/
+data_teacher_*/
+data_wk_*/
+data_ang_*/

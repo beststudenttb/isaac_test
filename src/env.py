@@ -65,6 +65,8 @@ class BallEnvCfg(DirectRLEnvCfg):
     stop_d = task_cfg.STOP_D
     stop_d_tol = task_cfg.STOP_D_TOL
     stop_x_tol = task_cfg.STOP_X_TOL
+    score_mode = task_cfg.SCORE_MODE
+    stop_ang_tol = task_cfg.STOP_ANG_TOL
 
 
 class BallEnv(DirectRLEnv):
@@ -205,6 +207,10 @@ class BallEnv(DirectRLEnv):
         )
 
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
+        if int(self.cfg.action_space) == 2:
+            # 无侧移变体(2026-09-09):agent 只出 [a_x, a_w],这里补 a_y=0 后下游一律按三维走。
+            zeros = torch.zeros_like(actions[:, :1])
+            actions = torch.cat([actions[:, :1], zeros, actions[:, 1:2]], dim=1)
         self.actions = actions.clone()
 
     def _apply_action(self) -> None:
@@ -301,11 +307,19 @@ class BallEnv(DirectRLEnv):
         in_view = (forward > 0.0) & (px_x >= 0.0) & (px_x < self.cfg.image_width)
         px_x = torch.where(in_view, px_x, torch.full_like(px_x, self.cfg.lost_x))
         dist = torch.where(in_view, forward, torch.full_like(forward, self.cfg.lost_d))
-        return {"px_x": px_x, "dist": dist}
+        # 物理量(2026-09-11):方位角 = 目标相对相机光轴的水平夹角(deg,左正),真实距离 = 平面欧氏距离。看不见时置 0。
+        bearing = torch.rad2deg(torch.atan2(left, torch.clamp(forward, min=1e-6)))
+        rng = torch.sqrt(forward * forward + left * left)
+        return {"px_x": px_x, "dist": dist,
+                "bearing_deg": torch.where(in_view, bearing, torch.zeros_like(bearing)),
+                "range": torch.where(in_view, rng, torch.full_like(rng, self.cfg.lost_d))}
 
     def in_stop_zone(self) -> torch.Tensor:
         label = self.project_target()
         cx = self.cfg.image_width * 0.5
+        if self.cfg.score_mode == "angle":
+            seen = label["dist"] > self.cfg.lost_d
+            return seen & (torch.abs(label["range"] - self.cfg.stop_d) <= self.cfg.stop_d_tol) & (torch.abs(label["bearing_deg"]) <= self.cfg.stop_ang_tol)
         dist_ok = torch.abs(label["dist"] - self.cfg.stop_d) <= self.cfg.stop_d_tol
         px_ok = torch.abs(label["px_x"] - cx) <= self.cfg.stop_x_tol
         return dist_ok & px_ok

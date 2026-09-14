@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import torch
 
 from isaaclab.utils import configclass
@@ -14,6 +16,7 @@ from src.env import BallEnv, BallEnvCfg
 class BallPPOEnvCfg(BallEnvCfg):
     action_space = 3
     observation_space = 4
+    obs_mask = ""  # teacher 观测残缺变体(2026-09-11):"x" 只给 x、"d" 只给 d、"coarse" x 三档 d 四档;"" 原样
     episode_length_s = 10.0
     read_camera = False
 
@@ -142,10 +145,43 @@ class BallPPOEnv(BallEnv):
 
     def policy_obs(self, x: torch.Tensor, d: torch.Tensor) -> torch.Tensor:
         end = self.end_obs()
+        nx, nd = self.norm_x(x, d), self.norm_d(d)
+        seen = d > self.cfg.lost_d
+        if self.cfg.obs_mask == "x":      # 只给 x:d 换成常数,但保留"看不见"的信息(x 的 -1 哨兵已带)
+            nd = torch.where(seen, torch.full_like(nd, 0.5), torch.zeros_like(nd))
+        elif self.cfg.obs_mask == "d":    # 只给 d:x 换成常数,看不见时仍是 -1
+            nx = torch.where(seen, torch.zeros_like(nx), torch.full_like(nx, -1.0))
+        elif self.cfg.obs_mask == "diam":   # 图像原生坐标 (x_center, 直径):直径像素 = 2·31.06/forward(实测 fx·R=31.1),归一到 [0,1]
+            nd = torch.where(seen, torch.clamp(2.0 * 31.06 / torch.clamp(d, min=0.3) / self.cfg.image_width, 0.0, 1.0), torch.zeros_like(nd))
+        elif self.cfg.obs_mask == "ang":    # 最精细:物理量 (方位角/40°, 真实距离/8)
+            lab = self.project_target()
+            nx = torch.where(seen, torch.clamp(lab["bearing_deg"] / 40.0, -1.0, 1.0), torch.full_like(nx, -1.0))
+            nd = torch.where(seen, torch.clamp(lab["range"] / self.cfg.fail_far, 0.0, 1.0), torch.zeros_like(nd))
+        elif self.cfg.obs_mask == "xyd":    # 图像原生三维 (x_c, 球心 y, 直径),占掉 end_x 的位置
+            diam = torch.where(seen, torch.clamp(2.0 * 31.06 / torch.clamp(d, min=0.3) / self.cfg.image_width, 0.0, 1.0), torch.zeros_like(nd))
+            cyn = torch.where(seen, (76.0 + 83.1 / torch.clamp(d, min=0.3)) / (self.cfg.image_width * 0.5) - 1.0, torch.full_like(nd, -1.0))
+            return torch.stack((nx, diam, end[:, 0], cyn), dim=-1)
+        elif self.cfg.obs_mask == "bbox":   # 图像 bbox (xmin, xmax, ymin, ymax),各归一到 [-1,1];看不见全 -1。球心 y = 76.0 + 83.1/forward(实测拟合),半径 = 31.06/forward
+            r_px = 31.06 / torch.clamp(d, min=0.3)
+            cy = 76.0 + 83.1 / torch.clamp(d, min=0.3)
+            half = self.cfg.image_width * 0.5
+            b = torch.stack(((x - r_px) / half - 1.0, (x + r_px) / half - 1.0, (cy - r_px) / half - 1.0, (cy + r_px) / half - 1.0), dim=-1).clamp(-1.0, 1.0)
+            b = torch.where(seen[:, None], b, torch.full_like(b, -1.0))
+            return b
+        elif self.cfg.obs_mask == "coarse":  # 粗 teacher:x 三档(左/中/右,阈值 ±10px),d 四档(>4 / 2-4 / 1.7-2 / ≤1.7)
+            if self.cfg.score_mode == "angle":
+                fx = self.cfg.image_width / (2.0 * math.tan(math.radians(self.cfg.fov_x_deg) * 0.5))
+                th = fx * math.tan(math.radians(float(self.cfg.stop_ang_tol))) / (self.cfg.image_width * 0.5)
+            else:
+                th = float(task_cfg.STOP_X_TOL) / (self.cfg.image_width * 0.5)
+            qx = torch.where(nx > th, torch.ones_like(nx), torch.where(nx < -th, -torch.ones_like(nx), torch.zeros_like(nx)))
+            nx = torch.where(seen, qx, torch.full_like(nx, -1.0))
+            qd = torch.where(d > 4.0, torch.full_like(nd, 0.75), torch.where(d > 2.0, torch.full_like(nd, 0.4), torch.where(d > 1.7, torch.full_like(nd, 0.24), torch.full_like(nd, 0.19))))
+            nd = torch.where(seen, qd, torch.zeros_like(nd))
         return torch.stack(
             (
-                self.norm_x(x, d),
-                self.norm_d(d),
+                nx,
+                nd,
                 end[:, 0],
                 end[:, 1],
             ),
