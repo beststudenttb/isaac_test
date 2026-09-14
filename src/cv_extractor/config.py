@@ -7,6 +7,14 @@ BALL_VISION_CONFIG = {
     "pretrained": True,
 }
 
+FREE_SPATIAL_CONFIG = {
+    "input_shape": (224, 224, 3),
+    "fpn_channels": 128,
+    "grid": 7,  # 56/28/14 全部整除，配合显式 avg_pool2d。
+    "feature_dim": 256,
+    "pretrained": False,
+}
+
 CV_XBIN_TRAIN_CONFIG = {
     "dataset_dir": "./data_isaac",
     "output_dir": "./models/vision/cv_reserve",
