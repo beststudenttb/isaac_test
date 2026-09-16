@@ -67,6 +67,9 @@ class BallEnvCfg(DirectRLEnvCfg):
     stop_x_tol = task_cfg.STOP_X_TOL
     score_mode = task_cfg.SCORE_MODE
     stop_ang_tol = task_cfg.STOP_ANG_TOL
+    chase_blue = False   # True 时奖励/停车判定改用蓝球(干扰球)的投影,红球留在场上当干扰
+    stop_x_tol_cam = task_cfg.STOP_X_TOL_CAM
+    stop_diam_tol = task_cfg.STOP_DIAM_TOL
 
 
 class BallEnv(DirectRLEnv):
@@ -291,7 +294,8 @@ class BallEnv(DirectRLEnv):
         self.target_view.set_world_poses(positions=pos, indices=env_ids.tolist())
 
     def target_in_head(self) -> tuple[torch.Tensor, torch.Tensor]:
-        delta = self.target_xy - self.robot_xy
+        src = self.noise_xy if (getattr(self.cfg, "chase_blue", False) and hasattr(self, "noise_xy")) else self.target_xy
+        delta = src - self.robot_xy
         yaw = self.robot_yaw + self.head_yaw
         c = torch.cos(yaw)
         s = torch.sin(yaw)
@@ -320,6 +324,9 @@ class BallEnv(DirectRLEnv):
         if self.cfg.score_mode == "angle":
             seen = label["dist"] > self.cfg.lost_d
             return seen & (torch.abs(label["range"] - self.cfg.stop_d) <= self.cfg.stop_d_tol) & (torch.abs(label["bearing_deg"]) <= self.cfg.stop_ang_tol)
+        if self.cfg.score_mode == "cam":   # 横向用像素,距离与 angle 相同(物理 range)
+            seen = label["dist"] > self.cfg.lost_d
+            return seen & (torch.abs(label["range"] - self.cfg.stop_d) <= self.cfg.stop_d_tol) & (torch.abs(label["px_x"] - cx) <= self.cfg.stop_x_tol_cam)
         dist_ok = torch.abs(label["dist"] - self.cfg.stop_d) <= self.cfg.stop_d_tol
         px_ok = torch.abs(label["px_x"] - cx) <= self.cfg.stop_x_tol
         return dist_ok & px_ok

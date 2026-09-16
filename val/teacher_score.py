@@ -18,6 +18,7 @@ parser.add_argument("--action-k", type=float, default=0.0)
 parser.add_argument("--num-envs", type=int, default=256)
 parser.add_argument("--no-lateral", action="store_true", help="与训练一致:动作空间 [a_x, a_w]")
 parser.add_argument("--obs-mask", default="")
+parser.add_argument("--score-mode", default=None, choices=("angle", "cam", "pixel"), help="奖励与 stop 判定的度量:angle=物理量(方位角/距离),cam=相机坐标(x_px/直径px),pixel=旧版")
 AppLauncher.add_app_launcher_args(parser)
 a = parser.parse_args(); a.headless = True; a.livestream = 0
 app = AppLauncher(a); sim = app.app
@@ -32,6 +33,7 @@ cfg.scene.num_envs = a.num_envs; cfg.sim.device = a.device; cfg.use_camera = Fal
 cfg.end_d_min = cfg.end_d_max = 1.5; cfg.end_x_min = cfg.end_x_max = 0.0; cfg.score_action_k = a.action_k
 if a.no_lateral: cfg.action_space = 2
 cfg.obs_mask = a.obs_mask
+if a.score_mode: cfg.score_mode = str(a.score_mode)
 env = ScorePPOEnv(cfg); dev = env.device
 m = PPO.load(str(Path(a.dir) / "last.zip"), device=dev)
 obs, _ = env.reset(); steps = int(round(15.0 / task_cfg.DT)); N = env.num_envs

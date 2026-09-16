@@ -1,4 +1,10 @@
-"""任务 v3 的确定性评估:64 env 各跑满一条 375 步 episode,报平均回报。
+"""BC 策略的确定性评估:直接用 stage1 的「编码器 + 读出头」当策略,不经过 PPO。
+
+只是把 val/score_student.py 的 actor 换成 head(encoder(img)) * std + mean 再 clamp,
+其余(env、起点、375 步、v1 判据、末 100 步统计)完全一致,便于和 PPO 的成绩逐格对比。
+
+原文件头:
+任务 v3 的确定性评估:64 env 各跑满一条 375 步 episode,报平均回报。
 
     ./IsaacLab/isaaclab.sh -p val/score_student.py --arm A
 
@@ -20,12 +26,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description="Deterministic evaluation for task v3.")
 parser.add_argument("--arm", required=True)  # 任意臂名:{ENCODER_ROOT}/{arm}/encoder_final.pt;"init" 特殊 = encoder_init.pt
 parser.add_argument("--num-envs", type=int, default=64)
-parser.add_argument("--ckpt", default="last.pt")
 parser.add_argument("--tag", default="")
 parser.add_argument("--encoder-root", default=None)
 parser.add_argument("--run-tag", default="")  # 训练时的 --tag,拼进 run 目录名
 parser.add_argument("--score-mode", default=None, choices=("angle", "cam", "pixel"), help="奖励与 stop 判定的度量,须与该表征对应的 teacher 一致")
-parser.add_argument("--chase-blue", action="store_true", help="改追蓝球(干扰球),红球留在场上当干扰;表征不变")
 parser.add_argument("--adapter", action="store_true")
 parser.add_argument("--adapter-hidden", type=int, default=0)
 parser.add_argument("--seed", type=int, default=None)
@@ -71,25 +75,37 @@ def main() -> None:
     env_cfg.angle_deg = float(cfg.ANGLE_DEG)
     if args_cli.score_mode:
         env_cfg.score_mode = str(args_cli.score_mode)
-    env_cfg.chase_blue = bool(args_cli.chase_blue)
     env_cfg.end_d_min = env_cfg.end_d_max = float(cfg.END_D_MIN)
     env_cfg.end_x_min = env_cfg.end_x_max = float(cfg.END_X_MIN)
     env = make_score_noise_student_env(env_cfg)
     device = torch.device(env.device)
 
     root = Path(args_cli.encoder_root) if args_cli.encoder_root else Path(cfg.ENCODER_ROOT)
-    enc_path = root / "encoder_init.pt" if args_cli.arm == "init" else root / args_cli.arm / "encoder_final.pt"
-    encoder = FrozenFreeEncoder(str(enc_path), **dict(FREE_SPATIAL_CONFIG)).to(device)
-    model = (AdapterActorCritic if args_cli.adapter else FreeFeatureActorCritic)(
-        encoder=encoder, **({"adapter_hidden": int(args_cli.adapter_hidden)} if args_cli.adapter else {}), goal_dim=2, act_dim=int(env.cfg.action_space),
-        pi_hidden=list(cfg.POLICY_NET), vf_hidden=list(cfg.VALUE_NET),
-        activation=ACTIVATIONS[str(cfg.ACTIVATION)], init_std=float(cfg.STD_INIT),
-    ).to(device)
-    suffix = f"_s{args_cli.seed}" if args_cli.seed is not None else ""
-    run_dir = Path(f"{cfg.OUT_ROOT}_{args_cli.arm}{suffix}{args_cli.run_tag}")
-    ck = torch.load(run_dir / args_cli.ckpt, map_location=device)
-    model.load_state_dict(ck["model"])
-    model.eval()
+    import json
+    sys.path.insert(0, str(PROJECT_ROOT / "src"))
+    from cv_extractor.free_spatial import FreeSpatialFeatureExtractor
+    from stage1_helpers import make_head
+    arm = args_cli.arm
+    encoder = FreeSpatialFeatureExtractor(**dict(FREE_SPATIAL_CONFIG)).to(device)
+    encoder.load_state_dict(torch.load(root / arm / "donor.pt", map_location=device))
+    encoder.eval()
+    _st = json.load(open(root / "target_stats.json"))
+    stats = _st.get(arm, _st["A"])   # <arm>_act 目录用动作头,统计量沿用 A 臂(目标就是动作)
+    t_mean = torch.tensor(stats["mean"], dtype=torch.float32, device=device)
+    t_std = torch.tensor(stats["std"], dtype=torch.float32, device=device)
+    head = make_head(int(FREE_SPATIAL_CONFIG["feature_dim"]), len(stats["mean"])).to(device)
+    head.load_state_dict(torch.load(root / arm / "head.pt", map_location=device))
+    head.eval()
+
+    class BCPolicy:
+        """stage1 学到的 o -> a 直接当策略。目标训练时做过 z-score,这里反归一化再 clamp。"""
+        def predict(self, image, goal):
+            z = encoder(image)["shared_feature"]
+            a = head(z) * t_std + t_mean
+            return torch.clamp(a, -1.0, 1.0)
+    model = BCPolicy()
+    run_dir = Path(f"{cfg.OUT_ROOT}_bc_{arm}{args_cli.run_tag}")
+    run_dir.mkdir(parents=True, exist_ok=True)
 
     obs, _ = env.reset()
     steps = int(round(float(cfg.EPISODE_S) / task_cfg.DT))
@@ -137,10 +153,10 @@ def main() -> None:
     t_amag = (tail_amag / TAIL).cpu().numpy()
     succ = (succ_step >= 0).cpu().numpy(); sstep = succ_step.cpu().numpy()
     v1 = float(succ.mean()); first = float(sstep[succ].mean()) if succ.any() else float("nan")
-    print(f"[RESULT] arm={args_cli.arm}{suffix}  v1成功率 {v1:.1%} 首次成功步 {first:.0f}  回报 mean={ret.mean():.1f}  std={ret.std():.1f}  "
+    print(f"[BC] arm={args_cli.arm}{args_cli.run_tag}  v1成功率 {v1:.1%} 首次成功步 {first:.0f}  回报 mean={ret.mean():.1f}  std={ret.std():.1f}  "
           f"满分={steps}  区内={dwell.mean():.3f}  末100步: xe={t_xe.mean():.1f}px de={t_de.mean():.3f}m "
           f"区内={t_zone.mean():.3f} |a|={t_amag.mean():.3f}", flush=True)
-    out = run_dir / f"eval_score{args_cli.tag}.csv"
+    out = run_dir / f"eval_bc{args_cli.tag}.csv"
     with out.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f); w.writerow(["env", "return", "zone_dwell", "tail_xe", "tail_de", "tail_zone", "tail_amag", "v1_success", "succ_step"])
         for i in range(len(ret)):

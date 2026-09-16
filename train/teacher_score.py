@@ -31,6 +31,7 @@ parser.add_argument("--tag", default="")
 parser.add_argument("--seed", type=int, default=None)  # 覆盖 teacher_cfg.SEED
 parser.add_argument("--no-lateral", action="store_true", help="动作空间去掉侧移 a_y,只剩 [a_x, a_w]")
 parser.add_argument("--obs-mask", default="", choices=("", "x", "d", "coarse", "diam", "bbox", "ang", "xyd"), help="teacher 观测残缺:只给 x / 只给 d / 粗档")
+parser.add_argument("--score-mode", default=None, choices=("angle", "cam", "pixel"), help="奖励与 stop 判定的度量:angle=物理量(方位角/距离),cam=相机坐标(x_px/直径px),pixel=旧版")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 if args_cli.seed is not None:
@@ -69,7 +70,7 @@ ACTIVATIONS = {
 
 def teacher_cfg_score_mode() -> str:
     from src import task_cfg as _tc
-    return str(_tc.SCORE_MODE)
+    return str(args_cli.score_mode) if args_cli.score_mode else str(_tc.SCORE_MODE)
 
 
 def make_out_dir() -> Path:
@@ -171,6 +172,7 @@ def make_cfg() -> ScorePPOEnvCfg:
     if args_cli.no_lateral:
         cfg.action_space = 2
     cfg.obs_mask = str(args_cli.obs_mask)
+    cfg.score_mode = teacher_cfg_score_mode()
     cfg.sim.device = args_cli.device
     cfg.use_camera = bool(teacher_cfg.USE_CAMERA)
     cfg.read_camera = bool(teacher_cfg.READ_CAMERA)

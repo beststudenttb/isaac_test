@@ -73,6 +73,13 @@ R_FAIL = -10.0  # fail done 或 timeout 时的终止 penalty。
 # (4m 处 0.162 -> 1.5m 处 0.891),且 1.7m 与 1.5m 还差 0.14(纯线性只差 0.016)。
 SCORE_ANG_SCALE = 8.5  # angle 模式位置分里方位角的尺度,deg(≈ 像素版 20px 在画面中心的角度)
 SCORE_X_SCALE = 20.0  # 图像横向误差的半分尺度,单位 px。
+# cam 模式(2026-09-14):误差量全在相机坐标 (x_px, 直径px) 上,尺度取成在停车点与 angle 模式等价。
+# 直径(px) = DIAM_K / d(从真实帧拟合,DIAM_K = 2*31.06);d=1.5m 时直径 41.4px。
+# 8.5° ≈ 20px(fx=133.5);1.5m 处 0.5m ≈ 13.8px 直径变化;3° ≈ 7px;0.2m ≈ 5.5px。
+DIAM_K = 62.12
+SCORE_DIAM_SCALE = 13.8  # cam 模式距离分的半分尺度,单位 px(直径)
+STOP_X_TOL_CAM = 7.0     # cam 模式 stop 区横向容差,px(≈3°)
+STOP_DIAM_TOL = 5.5      # cam 模式 stop 区直径容差,px(≈0.2m @1.5m)
 SCORE_D_SCALE = 0.5   # 距离误差的半分尺度,单位 m。
 # 动作惩罚(2026-09-08):score *= 1 - K * max(0, max|a| - DEAD)。乘法形式:远处 score 小、
 # 惩罚绝对量也小,不伤接近段;近处 score≈1 才咬住。DEAD 以内不罚,给 |a|<0.05 一个平台。

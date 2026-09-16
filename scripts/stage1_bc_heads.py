@@ -57,6 +57,26 @@ def calibrate_bn(encoder: nn.Module, frames: torch.Tensor, device: str) -> None:
         encoder(frames[idx].to(device))
 
 
+SUP_TARGET = "xd"
+
+
+def sup_target(tr: dict[str, np.ndarray]) -> np.ndarray:
+    """sup 臂 = teacher 自己看到的那两维(与 sb3_env.policy_obs 一致),由 --sup-target 选。"""
+    px, d = tr["px_x"].astype(np.float64), tr["dist"].astype(np.float64)
+    seen = d > 0.0
+    kind = SUP_TARGET
+    if kind == "cam":      # (x_c, 直径) —— obs_mask="diam"
+        diam = np.clip(62.12 / np.clip(d, 0.3, None) / 224.0, 0.0, 1.0)
+        return np.stack([fr.norm_x(tr["px_x"], tr["dist"]), np.where(seen, diam, 0.0)], axis=1).astype(np.float32)
+    if kind == "ang":      # (方位角/40, 距离/8) —— obs_mask="ang"
+        fx = 112.0 / np.tan(np.radians(40.0))
+        bear = np.degrees(np.arctan((112.0 - px) / fx))
+        rng_m = d / np.cos(np.radians(bear))
+        return np.stack([np.where(seen, np.clip(bear / 40.0, -1, 1), -1.0),
+                         np.where(seen, np.clip(rng_m / 8.0, 0, 1), 0.0)], axis=1).astype(np.float32)
+    return np.stack([fr.norm_x(tr["px_x"], tr["dist"]), fr.norm_d(tr["dist"])], axis=1)
+
+
 def build_targets(tr: dict[str, np.ndarray], train_mask: np.ndarray, a_target: str = "mu") -> tuple[dict[str, np.ndarray], dict]:
     """每个目标维度按训练集统计做 z-score。
 
@@ -69,7 +89,7 @@ def build_targets(tr: dict[str, np.ndarray], train_mask: np.ndarray, a_target: s
         "V": tr["value"][:, None],
         "R": tr["reward"][:, None],
         "rnd": mu,
-        "sup": np.stack([fr.norm_x(tr["px_x"], tr["dist"]), fr.norm_d(tr["dist"])], axis=1),
+        "sup": sup_target(tr),
     }
     stats, out = {}, {}
     for arm, y in raw.items():
@@ -100,12 +120,16 @@ def main() -> None:
     parser.add_argument("--donor-seed", type=int, default=DONOR_SEED)
     parser.add_argument("--head-seed", type=int, default=None)
     parser.add_argument("--a-target", choices=("mu", "sampled"), default="mu")
+    parser.add_argument("--sup-target", choices=("xd", "cam", "ang"), default="xd", help="sup 臂回归哪套坐标:xd=(x,d) 旧版,cam=(x_c,直径),ang=(方位角,距离)")
     parser.add_argument("--data", type=Path, default=fr.DATA_DIR)  # 数据目录(默认跟管线标签)
     parser.add_argument("--units", type=int, default=2)  # A 臂目标:teacher 网络的动作均值,或它实际执行的采样动作(只看行为)  # 只换头的初值;None = 跟 --seed。共享编码器初值和数据切分仍由 --seed 定  # 换 donor 种子,检验表征是否依赖 donor 的随机坐标
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--out-root", type=Path, default=fr.OUT_ROOT)
     parser.add_argument("--arms", nargs="+", default=None)
     args = parser.parse_args()
+
+    global SUP_TARGET
+    SUP_TARGET = str(args.sup_target)
 
     args.out_root.mkdir(parents=True, exist_ok=True)
     torch.manual_seed(args.seed)

@@ -36,6 +36,7 @@ from src.sb3_env import BallPPOEnv, BallPPOEnvCfg
 class ScorePPOEnvCfg(BallPPOEnvCfg):
     score_x_scale = task_cfg.SCORE_X_SCALE
     score_ang_scale = task_cfg.SCORE_ANG_SCALE
+    score_diam_scale = task_cfg.SCORE_DIAM_SCALE
     score_d_scale = task_cfg.SCORE_D_SCALE
     score_action_k = task_cfg.SCORE_ACTION_K
     score_action_dead = task_cfg.SCORE_ACTION_DEAD
@@ -45,6 +46,7 @@ class ScorePPOEnvCfg(BallPPOEnvCfg):
 class ScoreNoisePPOEnvCfg(NoisePPOEnvCfg):
     score_x_scale = task_cfg.SCORE_X_SCALE
     score_ang_scale = task_cfg.SCORE_ANG_SCALE
+    score_diam_scale = task_cfg.SCORE_DIAM_SCALE
     score_d_scale = task_cfg.SCORE_D_SCALE
     score_action_k = task_cfg.SCORE_ACTION_K
     score_action_dead = task_cfg.SCORE_ACTION_DEAD
@@ -54,6 +56,7 @@ class ScoreNoisePPOEnvCfg(NoisePPOEnvCfg):
 class ScoreStudentEnvCfg(MDPStudentEnvCfg):
     score_x_scale = task_cfg.SCORE_X_SCALE
     score_ang_scale = task_cfg.SCORE_ANG_SCALE
+    score_diam_scale = task_cfg.SCORE_DIAM_SCALE
     score_d_scale = task_cfg.SCORE_D_SCALE
     score_action_k = task_cfg.SCORE_ACTION_K
     score_action_dead = task_cfg.SCORE_ACTION_DEAD
@@ -63,6 +66,7 @@ class ScoreStudentEnvCfg(MDPStudentEnvCfg):
 class ScoreNoiseStudentEnvCfg(NoiseStudentEnvCfg):
     score_x_scale = task_cfg.SCORE_X_SCALE
     score_ang_scale = task_cfg.SCORE_ANG_SCALE
+    score_diam_scale = task_cfg.SCORE_DIAM_SCALE
     score_d_scale = task_cfg.SCORE_D_SCALE
     score_action_k = task_cfg.SCORE_ACTION_K
     score_action_dead = task_cfg.SCORE_ACTION_DEAD
@@ -79,6 +83,11 @@ class ScoreMixin:
             xe = torch.abs(lab["bearing_deg"])
             de = torch.abs(lab["range"] - self.end_d)
             score = 1.0 / (1.0 + xe / self.cfg.score_ang_scale + de / self.cfg.score_d_scale)
+        elif self.cfg.score_mode == "cam":  # 横向用相机坐标(像素),距离与 angle 模式共用物理 range
+            lab = self.project_target()
+            xe = torch.abs(lab["px_x"] - (self.cfg.image_width * 0.5 + self.end_x))
+            de = torch.abs(lab["range"] - self.end_d)
+            score = 1.0 / (1.0 + xe / self.cfg.score_x_scale + de / self.cfg.score_d_scale)
         else:
             end_px = self.cfg.image_width * 0.5 + self.end_x
             xe = torch.abs(x - end_px)

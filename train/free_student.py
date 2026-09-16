@@ -28,6 +28,8 @@ parser.add_argument("--updates", type=int, default=None)
 parser.add_argument("--seed", type=int, default=None)
 parser.add_argument("--encoder-root", default=None)  # 覆盖 cfg.ENCODER_ROOT(换头种子等对照用)
 parser.add_argument("--tag", default="")  # 追加到输出目录名
+parser.add_argument("--score-mode", default=None, choices=("angle", "cam", "pixel"), help="奖励与 stop 判定的度量,须与该表征对应的 teacher 一致")
+parser.add_argument("--chase-blue", action="store_true", help="改追蓝球(干扰球),红球留在场上当干扰;表征不变")
 parser.add_argument("--adapter", action="store_true")  # 骨干冻结,proj+LayerNorm 随 PPO 训
 parser.add_argument("--teacher-loss", type=float, default=None)   # 覆盖 cfg.TEACHER_LOSS:teacher 动作 MSE 的系数(带 teacher 启动)
 parser.add_argument("--stage1-steps", type=int, default=None)     # 覆盖 cfg.STAGE1_STEPS:全系数阶段的环境步数
@@ -157,6 +159,9 @@ def make_env() -> MDPStudentEnv:
     env_cfg.sim.render = sim_utils.RenderCfg(**render_kwargs)
     env_cfg.num_rerenders_on_reset = int(cfg.RERENDER_ON_RESET)
     env_cfg.angle_deg = float(cfg.ANGLE_DEG)  # 表征长在 ±45 的数据上,任务三对齐它。
+    if args_cli.score_mode:
+        env_cfg.score_mode = str(args_cli.score_mode)
+    env_cfg.chase_blue = bool(args_cli.chase_blue)
     env_cfg.end_d_min = end_d_min
     env_cfg.end_d_max = end_d_max
     env_cfg.end_x_min = end_x_min
@@ -313,6 +318,26 @@ def main() -> None:
 
     env = make_env()
     device = torch.device(env.device)
+
+    # 启动自检(2026-09-15):确认奖励/标签跟的是哪个球。追蓝球时必须贴合蓝球投影。
+    try:
+        import math as _m
+        env.reset()
+        _lab = env.project_target()
+        def _proj(_xy):
+            _d = _xy - env.robot_xy; _y = env.robot_yaw + env.head_yaw
+            _c, _s = torch.cos(_y), torch.sin(_y)
+            _f = _c * _d[:, 0] + _s * _d[:, 1]; _l = -_s * _d[:, 0] + _c * _d[:, 1]
+            _fx = env.cfg.image_width / (2.0 * _m.tan(_m.radians(env.cfg.fov_x_deg) * 0.5))
+            return env.cfg.image_width * 0.5 - _fx * _l / torch.clamp(_f, min=1e-6)
+        _v = _lab["dist"] > 0.3
+        if bool(_v.any()):
+            _er = float((_lab["px_x"][_v] - _proj(env.target_xy)[_v]).abs().mean())
+            _eb = float((_lab["px_x"][_v] - _proj(env.noise_xy)[_v]).abs().mean()) if hasattr(env, "noise_xy") else float("nan")
+            print(f"[SELFCHECK] chase_blue={getattr(env.cfg, 'chase_blue', False)} 有干扰球={hasattr(env, 'noise_xy')} "
+                  f"|标签-红球|={_er:.2f}px |标签-蓝球|={_eb:.2f}px", flush=True)
+    except Exception as _e:
+        print(f"[SELFCHECK] 跳过:{_e}", flush=True)
     encoder = FrozenFreeEncoder(str(encoder_path()), **encoder_cfg()).to(device)
     model = (AdapterActorCritic if args_cli.adapter else FreeFeatureActorCritic)(
         encoder=encoder,

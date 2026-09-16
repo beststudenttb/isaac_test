@@ -49,6 +49,7 @@ parser.add_argument("--deterministic", action="store_true")
 parser.add_argument("--clean", action="store_true")  # 默认带蓝色干扰球,与现有数据一致
 parser.add_argument("--no-lateral", action="store_true")  # 动作空间 [a_x, a_w];CSV 仍记三列,a_y/mu_y 恒 0
 parser.add_argument("--obs-mask", default="")  # 与 teacher 训练一致:"" / x / d / coarse / diam
+parser.add_argument("--score-mode", default=None, choices=("angle", "cam", "pixel"), help="奖励与 stop 判定的度量:angle=物理量(方位角/距离),cam=相机坐标(x_px/直径px),pixel=旧版")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 args_cli.headless = True
@@ -112,6 +113,7 @@ def make_env():
     if args_cli.no_lateral:
         cfg.action_space = 2
     cfg.obs_mask = str(args_cli.obs_mask)
+    if args_cli.score_mode: cfg.score_mode = str(args_cli.score_mode)
     cfg.scene.env_spacing = 16.0
     cfg.sim.device = args_cli.device
     cfg.angle_deg = float(args_cli.angle_deg)
