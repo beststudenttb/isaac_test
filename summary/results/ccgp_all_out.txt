@@ -1,0 +1,23 @@
+解码帧...
+
+配置            表征                  红球方位/同分布            红球方位/跨蓝球位置              蓝球方位/同分布
+diam_angle    init                   0.777                -0.581                 0.758
+diam_angle    A                      0.989                 0.989                 0.010
+diam_angle    V                      0.978                 0.975                 0.371
+diam_angle    R                      0.965                 0.956                 0.522
+diam_angle    sup                    0.995                 0.993                 0.005
+diam_cam      init                   0.779                -0.578                 0.758
+diam_cam      A                      0.995                 0.995                 0.018
+diam_cam      V                      0.978                 0.975                 0.141
+diam_cam      R                      0.967                 0.948                 0.513
+diam_cam      sup                    0.992                 0.991                -0.004
+ang_angle     init                   0.781                -0.577                 0.763
+ang_angle     A                      0.980                 0.980                 0.002
+ang_angle     V                      0.975                 0.971                 0.087
+ang_angle     R                      0.959                 0.943                 0.445
+ang_angle     sup                    0.986                 0.987                -0.004
+ang_cam       init                   0.778                -0.579                 0.759
+ang_cam       A                      0.977                 0.978                 0.024
+ang_cam       V                      0.973                 0.971                 0.110
+ang_cam       R                      0.967                 0.961                 0.519
+ang_cam       sup                    0.985                 0.985                -0.003

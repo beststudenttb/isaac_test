@@ -1,0 +1,88 @@
+共 5376 帧,14 个条件;base 拟合 192 帧、留出 192 帧
+
+=== init ===  base 留出:槽1方位 R²=0.800  槽1距离 R²=0.697  |  **槽2(蓝球)方位 R²=0.786**  <- 固定外观下的蓝球可读性,与析因渲染(随机光照/墙/地板)对比
+条件          槽1色      槽2色            方位 R²(跟槽1)      方位 R²(跟槽2)     |误差|→槽1     |误差|→槽2
+base        red      blue                0.889          -0.850        4.35       21.82
+swap        blue     red                -0.588           0.760       20.52        7.65
+only_red1   red      none                0.848              --        6.49          --
+only_red2   none     red                    --           0.827          --        6.60
+only_blue1  blue     none                0.359              --       13.40          --
+only_blue2  none     blue                   --           0.250          --       13.93
+two_red     red      red                 0.134          -0.005       15.01       16.42
+orange      orange   blue                0.773          -0.436        7.37       19.07
+magenta     magenta  blue                0.659          -0.335        9.44       18.43
+darkred     darkred  blue                0.859          -0.736        5.47       21.12
+yellow      yellow   blue                0.745          -0.413        7.94       18.93
+green       green    blue                0.652          -0.269        9.40       18.15
+cyan        cyan     blue                0.372           0.087       13.17       15.68
+white       white    blue                0.042           0.218       16.42       14.21
+
+=== A ===  base 留出:槽1方位 R²=0.989  槽1距离 R²=0.888  |  **槽2(蓝球)方位 R²=-0.119**  <- 固定外观下的蓝球可读性,与析因渲染(随机光照/墙/地板)对比
+条件          槽1色      槽2色            方位 R²(跟槽1)      方位 R²(跟槽2)     |误差|→槽1     |误差|→槽2
+base        red      blue                0.993          -1.035        0.84       22.84
+swap        blue     red                -0.953           0.984       22.91        0.88
+only_red1   red      none                0.998              --        0.75          --
+only_red2   none     red                    --           0.998          --        0.72
+only_blue1  blue     none               -0.906              --       22.62          --
+only_blue2  none     blue                   --          -1.157          --       23.83
+two_red     red      red                 0.323           0.355       11.71       11.42
+orange      orange   blue                0.989          -0.994        1.18       22.60
+magenta     magenta  blue                0.951          -0.894        3.34       22.10
+darkred     darkred  blue                0.993          -1.023        0.87       22.77
+yellow      yellow   blue                0.985          -0.980        1.51       22.53
+green       green    blue                0.328          -0.709       13.41       21.10
+cyan        cyan     blue               -0.793          -1.071       21.90       23.33
+white       white    blue               -0.869          -1.123       22.35       23.62
+
+=== V ===  base 留出:槽1方位 R²=0.979  槽1距离 R²=0.988  |  **槽2(蓝球)方位 R²=0.351**  <- 固定外观下的蓝球可读性,与析因渲染(随机光照/墙/地板)对比
+条件          槽1色      槽2色            方位 R²(跟槽1)      方位 R²(跟槽2)     |误差|→槽1     |误差|→槽2
+base        red      blue                0.986          -1.028        1.40       22.98
+swap        blue     red                -0.915           0.986       22.76        1.49
+only_red1   red      none                0.992              --        1.26          --
+only_red2   none     red                    --           0.991          --        1.36
+only_blue1  blue     none                0.033              --       16.95          --
+only_blue2  none     blue                   --           0.032          --       16.33
+two_red     red      red                 0.407           0.414       11.70       11.65
+orange      orange   blue                0.967          -0.834        2.43       21.83
+magenta     magenta  blue                0.909          -0.660        4.58       20.86
+darkred     darkred  blue                0.984          -0.986        1.47       22.75
+yellow      yellow   blue                0.948          -0.767        3.25       21.45
+green       green    blue                0.506          -0.148       11.84       17.58
+cyan        cyan     blue               -0.019           0.035       17.36       16.29
+white       white    blue                0.035           0.039       17.02       16.26
+
+=== R ===  base 留出:槽1方位 R²=0.989  槽1距离 R²=0.958  |  **槽2(蓝球)方位 R²=0.605**  <- 固定外观下的蓝球可读性,与析因渲染(随机光照/墙/地板)对比
+条件          槽1色      槽2色            方位 R²(跟槽1)      方位 R²(跟槽2)     |误差|→槽1     |误差|→槽2
+base        red      blue                0.993          -1.002        0.93       22.77
+swap        blue     red                -0.829           0.986       22.24        1.42
+only_red1   red      none                0.994              --        1.18          --
+only_red2   none     red                    --           0.991          --        1.38
+only_blue1  blue     none                0.213              --       14.85          --
+only_blue2  none     blue                   --           0.165          --       14.81
+two_red     red      red                 0.481           0.453       11.72       11.81
+orange      orange   blue                0.974          -0.752        2.37       21.23
+magenta     magenta  blue                0.880          -0.418        5.55       19.31
+darkred     darkred  blue                0.991          -0.919        1.16       22.29
+yellow      yellow   blue                0.964          -0.716        2.82       21.03
+green       green    blue                0.766          -0.267        7.93       18.29
+cyan        cyan     blue                0.168           0.092       15.48       15.54
+white       white    blue               -0.006           0.163       17.01       14.83
+
+=== sup ===  base 留出:槽1方位 R²=0.988  槽1距离 R²=0.939  |  **槽2(蓝球)方位 R²=-0.184**  <- 固定外观下的蓝球可读性,与析因渲染(随机光照/墙/地板)对比
+条件          槽1色      槽2色            方位 R²(跟槽1)      方位 R²(跟槽2)     |误差|→槽1     |误差|→槽2
+base        red      blue                0.993          -1.047        0.62       22.97
+swap        blue     red                -0.946           0.992       22.86        0.67
+only_red1   red      none                0.999              --        0.48          --
+only_red2   none     red                    --           0.999          --        0.50
+only_blue1  blue     none               -0.002              --       17.10          --
+only_blue2  none     blue                   --          -0.060          --       16.99
+two_red     red      red                 0.473           0.449       11.41       11.54
+orange      orange   blue                0.990          -1.056        0.93       22.99
+magenta     magenta  blue                0.974          -1.036        2.21       22.86
+darkred     darkred  blue                0.993          -1.049        0.65       22.97
+yellow      yellow   blue                0.987          -1.065        1.25       23.05
+green       green    blue                0.114          -0.072       16.00       17.05
+cyan        cyan     blue               -0.065          -0.052       17.63       16.93
+white       white    blue               -0.055          -0.055       17.54       16.95
+
+读法:探针只在 base 上学过。若某条件下'跟槽2'的 R² 高而'跟槽1'低,说明读出跟着颜色/身份跑,而不是跟着槽位。

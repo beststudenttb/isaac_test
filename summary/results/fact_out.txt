@@ -1,0 +1,81 @@
+析因数据 3840 帧(看得见球 3840),按 round 奇偶切分
+
+表征        方位角(deg)     x_c(px)       距离(m)      直径(px)        蓝球方位        蓝球距离     光强(log)        光色暖冷         墙亮度        地板亮度
+init         0.763       0.762       0.495       0.626       0.746       0.558       0.726      -0.721       0.430       0.308
+A            0.992       0.991       0.908       0.964       0.042       0.025       0.531      -0.009       0.168       0.248
+V            0.983       0.982       0.978       0.988       0.462       0.385       0.609       0.054       0.265       0.323
+R            0.966       0.965       0.940       0.965       0.547       0.511       0.770      -0.074       0.320       0.496
+sup          0.998       0.997       0.944       0.979       0.025       0.010       0.465      -0.032       0.069       0.078
+
+配对扰动:每个变量单独变化引起的 Δz,折算成等价的球位移(停车容差 3° / 0.2m)
+表征    扰动                 等价角度°      等价距离m
+init  bear+1deg           1.65      0.059
+init  bear+5px            2.15      0.077
+init  rng+0.1m            1.78      0.064
+init  rng+2pxdiam         2.08      0.075
+init  blue_move           5.30      0.191
+init  light_x0.3          2.15      0.077
+init  light_x3            2.66      0.096
+init  light_warm          2.50      0.090
+init  light_cool          2.38      0.086
+init  wall_dark           3.23      0.117
+init  wall_red            2.06      0.074
+init  floor_dark          2.95      0.106
+init  floor_blue          2.76      0.100
+
+A     bear+1deg           1.11      0.081
+A     bear+5px            2.15      0.156
+A     rng+0.1m            0.78      0.057
+A     rng+2pxdiam         1.03      0.075
+A     blue_move           0.25      0.018
+A     light_x0.3          0.46      0.033
+A     light_x3            0.40      0.029
+A     light_warm          0.46      0.034
+A     light_cool          0.45      0.033
+A     wall_dark           0.69      0.050
+A     wall_red            1.27      0.092
+A     floor_dark          1.91      0.138
+A     floor_blue          0.33      0.024
+
+V     bear+1deg           1.32      0.013
+V     bear+5px            2.15      0.022
+V     rng+0.1m            3.00      0.030
+V     rng+2pxdiam         7.45      0.075
+V     blue_move           1.09      0.011
+V     light_x0.3          1.66      0.017
+V     light_x3            1.28      0.013
+V     light_warm          0.77      0.008
+V     light_cool          0.74      0.007
+V     wall_dark           3.34      0.034
+V     wall_red            5.47      0.055
+V     floor_dark          2.52      0.025
+V     floor_blue          1.05      0.011
+
+R     bear+1deg           1.39      0.043
+R     bear+5px            2.15      0.067
+R     rng+0.1m            1.89      0.059
+R     rng+2pxdiam         2.42      0.075
+R     blue_move           1.63      0.051
+R     light_x0.3          1.18      0.037
+R     light_x3            1.39      0.043
+R     light_warm          1.28      0.040
+R     light_cool          1.28      0.040
+R     wall_dark           1.88      0.058
+R     wall_red            2.42      0.075
+R     floor_dark          2.02      0.063
+R     floor_blue          1.00      0.031
+
+sup   bear+1deg           1.11      0.047
+sup   bear+5px            2.15      0.090
+sup   rng+0.1m            0.96      0.040
+sup   rng+2pxdiam         1.79      0.075
+sup   blue_move           0.55      0.023
+sup   light_x0.3          0.85      0.036
+sup   light_x3            0.40      0.017
+sup   light_warm          0.32      0.013
+sup   light_cool          0.34      0.014
+sup   wall_dark           1.39      0.058
+sup   wall_red            2.29      0.096
+sup   floor_dark          0.71      0.030
+sup   floor_blue          0.45      0.019
+

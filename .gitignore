@@ -44,3 +44,13 @@ data_ang_*/
 data_g4_*/
 data_factorial/
 data_probe_grid/
+
+# 受控渲染出来的帧(可由 scripts/render_*.py 重现,每批 ~70MB)
+data_factorial/
+data_identity/
+data_shape/
+data_distract/
+
+# 例外:分析输出与成图要进库(*.txt / *.png 默认被上面挡掉了)
+!summary/results/*.txt
+!figs/*.png
