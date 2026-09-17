@@ -1,5 +1,15 @@
 # Project Summary
 
+> **⚠️ 本文档主体写于 2026-07-24,描述的是 MDP / SPR / 世界模型那几条线,现在都已停。
+> 当前唯一有效的状态说明是 [`2026_09_17_status.md`](2026_09_17_status.md)。**
+> 下面保留的内容里,**仿真环境、采集、渲染性能、目录约定**这些基础设施部分仍然有效;
+> 「当前重点」「近期实验结论」「阶段一/二方案」等章节已过时,只作历史记录。
+>
+> **当前这条线(2026-09 起)**:无人工标注、无特权信息,只用 teacher 的行为信号
+> (动作 A / 估值 V / 奖励 R)训视觉表征,冻结后纯 PPO,重点是**测量表征里到底是什么**。
+> 详见 `2026_09_17_status.md` 与 `2026_09_14_interpretability_and_trajectory_report.md`。
+
+
 本项目是视觉强化学习机器人研究项目，从原 Webots + PPO + teacher guidance + imitation learning 路线迁移到 Isaac / IsaacLab，用于测试并行仿真、相机采集和后续视觉策略训练。整体走 train-by-cheat：特权信息 teacher PPO 训练视觉 student。
 
 当前阶段：teacher PPO、自写 student PPO、视觉 student、MDP student、SPR student 和离线评估入口都已就绪；当前重点是比较人工视觉表征、MDP latent、SPR latent 和随机/弱表征 baseline 在 PPO student 中的稳定性，并通过带干扰视觉环境检验表征是否真正关注目标。
