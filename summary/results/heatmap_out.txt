@@ -1,0 +1,61 @@
+data_identity/base init 贡献范围 [-8.272,10.803]
+data_identity/base A 贡献范围 [-4.974,2.827]
+data_identity/base V 贡献范围 [-5.351,5.491]
+data_identity/base R 贡献范围 [-2.306,1.897]
+data_identity/base sup 贡献范围 [-2.371,3.245]
+data_identity/two_red init 贡献范围 [-8.230,10.790]
+data_identity/two_red A 贡献范围 [-5.192,2.965]
+data_identity/two_red V 贡献范围 [-4.988,5.224]
+data_identity/two_red R 贡献范围 [-2.289,1.876]
+data_identity/two_red sup 贡献范围 [-2.357,3.116]
+data_shape/two_red_sh init 贡献范围 [-7.314,7.571]
+data_shape/two_red_sh A 贡献范围 [-4.956,3.731]
+data_shape/two_red_sh V 贡献范围 [-4.155,5.168]
+data_shape/two_red_sh R 贡献范围 [-2.599,2.280]
+data_shape/two_red_sh sup 贡献范围 [-2.307,3.712]
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 32418 (\N{CJK UNIFIED IDEOGRAPH-7EA2}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 29699 (\N{CJK UNIFIED IDEOGRAPH-7403}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 34013 (\N{CJK UNIFIED IDEOGRAPH-84DD}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 31435 (\N{CJK UNIFIED IDEOGRAPH-7ACB}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 26041 (\N{CJK UNIFIED IDEOGRAPH-65B9}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 23545 (\N{CJK UNIFIED IDEOGRAPH-5BF9}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 12302 (\N{LEFT WHITE CORNER BRACKET}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 20301 (\N{CJK UNIFIED IDEOGRAPH-4F4D}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 35282 (\N{CJK UNIFIED IDEOGRAPH-89D2}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 12303 (\N{RIGHT WHITE CORNER BRACKET}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 35835 (\N{CJK UNIFIED IDEOGRAPH-8BFB}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 20986 (\N{CJK UNIFIED IDEOGRAPH-51FA}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 30340 (\N{CJK UNIFIED IDEOGRAPH-7684}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 31354 (\N{CJK UNIFIED IDEOGRAPH-7A7A}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 38388 (\N{CJK UNIFIED IDEOGRAPH-95F4}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 36129 (\N{CJK UNIFIED IDEOGRAPH-8D21}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 29486 (\N{CJK UNIFIED IDEOGRAPH-732E}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 27491 (\N{CJK UNIFIED IDEOGRAPH-6B63}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 21521 (\N{CJK UNIFIED IDEOGRAPH-5411}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 36127 (\N{CJK UNIFIED IDEOGRAPH-8D1F}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 32593 (\N{CJK UNIFIED IDEOGRAPH-7F51}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+/home/tb/.claude/jobs/2174f11a/tmp/heatmap.py:69: UserWarning: Glyph 26684 (\N{CJK UNIFIED IDEOGRAPH-683C}) missing from font(s) DejaVu Sans.
+  plt.tight_layout(); plt.savefig(OUT/"heatmap_distractor.png",dpi=130)
+
+[DONE] -> /home/tb/Downloads/isaac_test/figs/heatmap_distractor.png

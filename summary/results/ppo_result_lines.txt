@@ -44,3 +44,12 @@
 [RESULT] arm=V_donor_nzgreen v1成功率 65.6% 首次成功步 149 回报 mean=155.7 std=105.1 满分=375 区内=0.453 末100步: xe=4.7px de=2.394m 区内=0.639 |a|=0.115
 [RESULT] arm=init_nzgreen v1成功率 56.2% 首次成功步 136 回报 mean=139.0 std=116.2 满分=375 区内=0.383 末100步: xe=15.4px de=2.362m 区内=0.545 |a|=0.068
 [RESULT] arm=sup_donor_nzgreen v1成功率 39.1% 首次成功步 139 回报 mean=100.7 std=111.6 满分=375 区内=0.273 末100步: xe=19.7px de=4.641m 区内=0.383 |a|=0.553
+[RESULT] arm=A_donor_s2_nzgreen v1成功率 90.6% 首次成功步 118 回报 mean=230.3 std=80.2 满分=375 区内=0.689 末100步: xe=4.6px de=0.709m 区内=0.888 |a|=0.065
+[RESULT] arm=A_donor_s3_nzgreen v1成功率 85.9% 首次成功步 120 回报 mean=226.0 std=92.4 满分=375 区内=0.642 末100步: xe=5.6px de=0.654m 区内=0.842 |a|=0.097
+[RESULT] arm=R_donor_s2_nzgreen v1成功率 93.8% 首次成功步 151 回报 mean=210.8 std=73.8 满分=375 区内=0.634 末100步: xe=3.7px de=0.512m 区内=0.918 |a|=0.059
+[RESULT] arm=R_donor_s3_nzgreen v1成功率 89.1% 首次成功步 122 回报 mean=197.7 std=70.4 满分=375 区内=0.618 末100步: xe=6.1px de=0.547m 区内=0.873 |a|=0.051
+[RESULT] arm=A_donor_s2_nzred v1成功率 35.9% 首次成功步 112 回报 mean=110.7 std=116.7 满分=375 区内=0.279 末100步: xe=20.7px de=3.047m 区内=0.352 |a|=0.053
+[RESULT] arm=A_donor_s3_nzred v1成功率 39.1% 首次成功步 105 回报 mean=129.1 std=127.7 满分=375 区内=0.309 末100步: xe=18.6px de=2.899m 区内=0.383 |a|=0.079
+[RESULT] arm=R_donor_s3_nzred v1成功率 28.1% 首次成功步 143 回报 mean=84.7 std=90.8 满分=375 区内=0.182 末100步: xe=21.1px de=2.945m 区内=0.264 |a|=0.085
+[RESULT] arm=V_donor_s3_g4_diam_angle_red v1成功率 64.1% 首次成功步 164 回报 mean=142.9 std=99.8 满分=375 区内=0.405 末100步: xe=6.4px de=1.534m 区内=0.603 |a|=0.120
+[RESULT] arm=V_donor_s3_g4_diam_angle_blue v1成功率 79.7% 首次成功步 178 回报 mean=171.3 std=88.1 满分=375 区内=0.463 末100步: xe=5.3px de=0.847m 区内=0.755 |a|=0.115
