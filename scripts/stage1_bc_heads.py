@@ -90,6 +90,10 @@ def build_targets(tr: dict[str, np.ndarray], train_mask: np.ndarray, a_target: s
         "R": tr["reward"][:, None],
         "rnd": mu,
         "sup": sup_target(tr),
+        # 机制拆分:把"维数 / 对称性 / 可提取性"三者解耦。ACT_IDX=(a_x, a_w),所以 mu[:,1] 是转向。
+        "Asym": np.stack([mu[:, 0], np.abs(mu[:, 1])], axis=1),
+        "Aw": mu[:, 1:2],
+        "Ax": mu[:, 0:1],
     }
     stats, out = {}, {}
     for arm, y in raw.items():

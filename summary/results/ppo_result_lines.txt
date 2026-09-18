@@ -53,3 +53,4 @@
 [RESULT] arm=R_donor_s3_nzred v1成功率 28.1% 首次成功步 143 回报 mean=84.7 std=90.8 满分=375 区内=0.182 末100步: xe=21.1px de=2.945m 区内=0.264 |a|=0.085
 [RESULT] arm=V_donor_s3_g4_diam_angle_red v1成功率 64.1% 首次成功步 164 回报 mean=142.9 std=99.8 满分=375 区内=0.405 末100步: xe=6.4px de=1.534m 区内=0.603 |a|=0.120
 [RESULT] arm=V_donor_s3_g4_diam_angle_blue v1成功率 79.7% 首次成功步 178 回报 mean=171.3 std=88.1 满分=375 区内=0.463 末100步: xe=5.3px de=0.847m 区内=0.755 |a|=0.115
+[RESULT] arm=R_donor_s2_nzred v1成功率 48.4% 首次成功步 166 回报 mean=122.2 std=107.4 满分=375 区内=0.307 末100步: xe=16.4px de=2.427m 区内=0.466 |a|=0.054
