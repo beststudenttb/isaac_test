@@ -18,19 +18,24 @@ from src.sb3_env import BallPPOEnv, BallPPOEnvCfg
 NOISE_MIN_DIST = 0.5
 
 
+# 2026-09-18:干扰物形状可换(默认 sphere,不影响任何既有实验)。用来把「颜色」与「形状」
+# 在**策略层面**分开测:表征层面已经证明形状无关(红立方 0.731 > 红球 0.607,跟投影面积走)。
+NOISE_SHAPES = ("sphere", "cube", "cone")
+
+
 @configclass
 class NoiseEnvCfg(BallEnvCfg):
-    pass
+    noise_shape = "sphere"
 
 
 @configclass
 class NoisePPOEnvCfg(BallPPOEnvCfg):
-    pass
+    noise_shape = "sphere"
 
 
 @configclass
 class NoiseStudentEnvCfg(MDPStudentEnvCfg):
-    pass
+    noise_shape = "sphere"
 
 
 class NoiseMixin:
@@ -54,10 +59,15 @@ class NoiseMixin:
 
     def _spawn_env(self, env_path: str):
         super()._spawn_env(env_path)
-        noise = sim_utils.SphereCfg(
-            radius=self.cfg.target_radius,
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.1, 1.0)),
-        )
+        r = self.cfg.target_radius
+        mat = sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.1, 1.0))
+        shape = getattr(self.cfg, "noise_shape", "sphere")
+        if shape == "cube":      # 外接盒与球相同:边长 2r
+            noise = sim_utils.CuboidCfg(size=(2 * r, 2 * r, 2 * r), visual_material=mat)
+        elif shape == "cone":
+            noise = sim_utils.ConeCfg(radius=r, height=2 * r, visual_material=mat)
+        else:
+            noise = sim_utils.SphereCfg(radius=r, visual_material=mat)
         noise.func(
             f"{env_path}/noise",
             noise,

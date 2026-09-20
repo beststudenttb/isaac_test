@@ -46,6 +46,7 @@ parser.add_argument("--render-mode", default="balanced")
 parser.add_argument("--aa", default="Off")
 parser.add_argument("--dlss-mode", type=int, default=None)
 parser.add_argument("--deterministic", action="store_true")
+parser.add_argument("--multi", action="store_true", help="4 物体环境采数据(teacher 仍只追红球=槽位0)")
 parser.add_argument("--clean", action="store_true")  # 默认带蓝色干扰球,与现有数据一致
 parser.add_argument("--no-lateral", action="store_true")  # 动作空间 [a_x, a_w];CSV 仍记三列,a_y/mu_y 恒 0
 parser.add_argument("--obs-mask", default="")  # 与 teacher 训练一致:"" / x / d / coarse / diam
@@ -70,6 +71,7 @@ import isaaclab.sim as sim_utils
 
 from src.sb3_env import BallPPOEnv
 from src.noise_env import NoiseMixin
+from src.multi_env import MultiMixin, ScoreMultiPPOEnvCfg
 from src.score_env import ScoreMixin, ScoreNoisePPOEnvCfg, ScorePPOEnvCfg
 
 CSV_FIELDS = [
@@ -104,8 +106,18 @@ class DatasetNoisePPOEnv(NoiseMixin, DatasetBallPPOEnv):
         self.init_noise()
 
 
+class DatasetMultiPPOEnv(MultiMixin, DatasetBallPPOEnv):
+    def __init__(self, cfg):
+        super().__init__(cfg)
+        self.init_slots()
+
+
 def make_env():
-    cfg = ScorePPOEnvCfg() if args_cli.clean else ScoreNoisePPOEnvCfg()
+    if args_cli.multi:
+        cfg = ScoreMultiPPOEnvCfg()
+        cfg.target_slot = 0        # teacher 永远追红球
+    else:
+        cfg = ScorePPOEnvCfg() if args_cli.clean else ScoreNoisePPOEnvCfg()
     cfg.seed = int(args_cli.seed)
     cfg.episode_length_s = float(args_cli.episode_s)
     cfg.stop_n = int(args_cli.stop_n)
@@ -124,7 +136,10 @@ def make_env():
     cfg.use_camera = True
     cfg.read_camera = True
     cfg.num_rerenders_on_reset = 1
-    env_cls = DatasetBallPPOEnv if args_cli.clean else DatasetNoisePPOEnv
+    if args_cli.multi:
+        env_cls = DatasetMultiPPOEnv
+    else:
+        env_cls = DatasetBallPPOEnv if args_cli.clean else DatasetNoisePPOEnv
     return env_cls(cfg)
 
 

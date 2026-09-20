@@ -1,0 +1,212 @@
+<meta charset="utf-8">
+<title>课 03:「表征塌了」到底怎么测</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+<link rel="stylesheet" href="../assets/quiz.css">
+<script src="../assets/quiz.js"></script>
+
+<p class="kicker">课 03 · 像素 RL 的表征问题</p>
+<h1>「表征塌了」到底怎么测</h1>
+<p class="subtitle">约 12 分钟。热身两题 → 读 → 做 4 道题。这一课会推翻我们今天下的一个结论。</p>
+
+<div class="takeaway">
+  <p><strong>这节课你会拿到三个能真算出来的探针</strong>,以及一个不太舒服的发现:
+  你现在记的 <code>z_std</code> <strong>测不到</strong>你想测的东西——它涨了不能说明没塌,跌了也不能说明塌了。</p>
+  <p>直接后果:今天那句"coadapt 的表征没塌,反而膨胀 13 倍"<strong>证据不足</strong>,得降级成待验证。</p>
+</div>
+
+<h2>热身:先回忆两下</h2>
+
+<div class="quiz" data-quiz-src="#quiz-warm"></div>
+
+<h2>先看 z_std 漏了什么</h2>
+
+<p>你现在记的是这一行(<code>src/rl/agent.py</code> 与 <code>sac_agent.py</code> 里都有):</p>
+
+<p><code>z_std = repr_.std(dim=0).mean()</code></p>
+
+<p>意思是:每个特征维度在 batch 上的标准差,再对 128 个维度取平均。
+它测的是<strong>"每一维各自动不动"</strong>。</p>
+
+<div class="analogy">
+  <span class="label">类比</span>
+  <p>一个 128 人的乐团,你想知道他们是不是在演奏有内容的音乐。你的测法是:
+  <em>量每个人的音量,然后取平均</em>。</p>
+  <p>问题来了——如果 128 个人全在<strong>齐奏同一个音符</strong>,而且齐奏得很响,
+  你的仪表会显示"音量很大,一切正常"。但这个乐团实际上只提供了<strong>一条</strong>信息,
+  剩下 127 个人是多余的。反过来,一个真正在演奏复杂和声但整体很轻柔的乐团,
+  你的仪表会显示"音量很小"。</p>
+  <p>你要测的是<strong>有多少条独立的声部</strong>,不是<strong>总音量</strong>。</p>
+</div>
+
+<p>这不是打比方打过头了,是能算出来的。下面四种 128 维特征,每种 256 个样本:</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>特征长什么样</th><th>z_std(你现在记的)</th><th>独立方向数</th></tr></thead>
+  <tbody>
+    <tr><td>健康,各维独立</td><td>1.000</td><td>125</td></tr>
+    <tr><td>塌到只剩 1 维,但幅度放大 10 倍</td><td><strong>8.296</strong></td><td><strong>1</strong></td></tr>
+    <tr><td>塌到只剩 3 维,幅度放大 5 倍</td><td>4.642</td><td>3</td></tr>
+    <tr><td>健康,但整体幅度只有 0.1 倍</td><td><strong>0.100</strong></td><td><strong>125</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p><code>z_std</code> 最大的那一行(8.3),信息只剩 <strong>1 维</strong>。
+<code>z_std</code> 最小的那一行(0.1),信息是<strong>完整的</strong>。
+两个方向都能骗过它——因为它把<em>幅度</em>和<em>结构</em>混在一起了,而塌缩是结构问题。</p>
+
+<h2>探针一:有效秩 srank</h2>
+
+<p>直接测"有多少条独立声部"。Kumar et al.(ICLR 2021)给的定义是:</p>
+
+<div class="thesis">
+  <p class="q">srank<sub>δ</sub>(Φ) = min { k : (σ<sub>1</sub>+…+σ<sub>k</sub>) / (σ<sub>1</sub>+…+σ<sub>d</sub>) ≥ 1−δ }</p>
+  <p class="hint">σ 是奇异值,从大到小;原文取 δ = 0.01</p>
+</div>
+
+<p>人话:把特征矩阵做 SVD,看<strong>前几个奇异值就占了 99% 的份量</strong>。
+如果 128 维特征只要 3 个奇异值就占满 99%,那它实际上只有 3 维。
+除以总和这一步让它<strong>对整体幅度不敏感</strong>——这正是 <code>z_std</code> 缺的那一步。</p>
+
+<p>他们把这个现象叫 <strong>implicit under-parameterization</strong>(隐式欠参数化),
+原文的定义是"srank 的下降,作为学习深度 Q 网络的<em>副产品</em>隐式发生"。
+观测到的样子是:训练一段时间后 srank <em>陡降</em>,而且下降与性能退化同时发生
+——Atari 上 512 维特征最后只剩 20–100 个奇异分量还活着。</p>
+
+<h2>探针二:Bellman 两端的特征点积</h2>
+
+<p>上一课提过 DR3(Kumar et al., ICLR 2022)。它的正则项就是一个可以直接拿来当探针的量:</p>
+
+<div class="thesis">
+  <p class="q">Σ<sub>i</sub> φ(s<sub>i</sub>, a<sub>i</sub>)<sup>⊤</sup> φ(s′<sub>i</sub>, a′<sub>i</sub>)</p>
+  <p class="hint">Bellman backup 两端那对状态-动作的特征,点积</p>
+</div>
+
+<p>原文对现象的描述是:"相邻状态-动作对的特征表现出很大的点积值",
+而且优化器<em>没有任何显式目标</em>要求这样,它却"把网络推向更高的特征点积"。
+换成人话:<strong>网络偷偷让"这一步"和"下一步"在特征空间里长得越来越像</strong>。
+像到极致,它就分不清两者了——而 TD 学习恰恰要靠这两者的差来更新。</p>
+
+<p>值得单记一笔:DR3 论文报告,光是压住这个点积,<strong>不加任何显式的秩约束</strong>,
+秩塌缩就"完全被缓解"了。也就是说探针二和探针一测的是<em>同一条病</em>的两个侧面,
+而点积是更靠上游的那一侧。</p>
+
+<h2>探针三:睡着的神经元比例</h2>
+
+<p>Sokar, Agarwal, Castro &amp; Evci(ICML 2023)报告了 <strong>dormant neuron phenomenon</strong>:
+训练过程中失活的神经元越来越多,直接吃掉网络的表达力。
+他们在 Atari 上的 DQN 与 DrQ、以及 MuJoCo 上的 SAC 都观测到了。
+解法叫 <strong>ReDo</strong>——把睡着的神经元循环回收(重新初始化),
+把表达力维持住。</p>
+
+<p>这个探针最好实现:统计激活值长期接近零的单元占比。它和秩塌缩相关但不等价
+——秩可以在没有任何死单元的情况下塌掉(<a href="https://arxiv.org/abs/2303.01486">Lyle et al. ICML 2023</a>
+就明确说可塑性丧失"常在没有饱和单元的情况下发生")。</p>
+
+<h2>三个探针各抓什么</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>探针</th><th>抓的是</th><th>z_std 会不会漏</th></tr></thead>
+  <tbody>
+    <tr><td>srank<sub>δ</sub></td><td>还剩几条独立方向(结构)</td><td>会漏。幅度涨着塌它也看不见</td></tr>
+    <tr><td>φ(s,a)<sup>⊤</sup>φ(s′,a′)</td><td>相邻两步的特征是不是越来越像</td><td>完全测不到</td></tr>
+    <tr><td>dormant 比例</td><td>有多少单元已经不干活了</td><td>完全测不到</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>所以今天哪些结论要降级</h2>
+
+<p>今天我们看 coadapt 的 <code>z_std</code> 从 0.148 涨到 2.4,得出的是:
+"表征没塌,反而膨胀"。<strong>这个推论不成立</strong>——上面第二行就是反例:
+幅度涨 10 倍同时塌到 1 维,<code>z_std</code> 也会涨。</p>
+
+<p>能保留的说法只有:<strong>"encoder 输出的幅度在持续变大"</strong>(这是事实),
+以及<strong>"表征在动"</strong>(幅度变化本身就说明它在动)。
+不能保留的是"没塌"——那需要 srank 才能说。</p>
+
+<p class="aside">这不改变今天的主结论。Q 先飞、表征后动的<strong>时序</strong>证据不依赖 z_std
+(靠的是 q1 和 a_mag 的时间线),排除 SPR 的证据也不依赖它(靠的是 pixels 线没有 SPR 却同样飞)。
+被降级的只是"表征没塌"这一句附带描述。想给它补上证据,加个 srank 大概是五行的事
+——不过那是要不要动代码的决定,不是这节课的内容。</p>
+
+<h2>检索练习</h2>
+
+<div class="quiz" data-quiz-src="#quiz-main"></div>
+
+<h2>去读这一篇</h2>
+
+<p><strong>Kumar, Agarwal, Ghosh &amp; Levine, <em>Implicit Under-Parameterization Inhibits
+Data-Efficient Deep Reinforcement Learning</em>, ICLR 2021 ·
+<a href="https://arxiv.org/abs/2010.14498">arxiv.org/abs/2010.14498</a></strong></p>
+
+<p>看两样东西就够:srank<sub>δ</sub> 的定义(为什么要除以奇异值总和),
+以及那几张 srank 随训练陡降的曲线图。看完你会对"秩塌缩"有个视觉印象,
+以后自己画这条曲线时知道正常和异常长什么样。</p>
+
+<p>要顺便看第二篇的话:<a href="https://arxiv.org/abs/2302.12902">Sokar et al., 2302.12902</a>
+(dormant neuron + ReDo),它最容易照着实现。</p>
+
+<div class="ask">
+  <strong>随时问我。</strong>比如:srank 该在哪一层算——encoder 输出的 z,还是 critic trunk
+  过了 LayerNorm 之后?(这个问题有讲究,因为你的 critic 第一层就是 LayerNorm,
+  它会把幅度归掉但不会恢复秩。)或者:三个探针里哪个最该先加、加在哪条线上?
+  下一课备选:① TD 梯度自带的退化压力(共适应)和 capacity loss 到底是不是一件事;
+  ② 那些"与路线正交的稳定器"(LayerNorm / reset / InFeR / ReDo)分别治什么,怎么选。
+</div>
+
+<script type="application/json" id="quiz-warm">
+[
+  {
+    "q": "上一课的三问检查表里,第一问问的是什么?",
+    "a": ["奖励有多稠密", "网络有多大个", "训练跑多少步", "用哪种优化器"],
+    "correct": 0,
+    "why": "奖励密度。另两问是「成功要多精确」和「一条 episode 里有几个真终止」。三项都在难那侧,别人的拐杖就别指望能搬过来。"
+  },
+  {
+    "q": "SAC+AE(自编码重建 loss + 阻断 actor 梯度)属于哪条路线?",
+    "a": ["路线 A", "路线 B", "路线 C", "路线 D"],
+    "correct": 1,
+    "why": "TD 梯度 + 自监督(重建)一起训 encoder = 路线 B。注意它同时还带了「阻断 actor 梯度」这根额外的拐杖——一篇论文可以拄不止一根。"
+  }
+]
+</script>
+
+<script type="application/json" id="quiz-main">
+[
+  {
+    "q": "某条线的 <code>z_std</code> 一路上涨。下面哪个推论是<b>站得住</b>的?",
+    "a": ["表征肯定没有塌缩", "表征肯定已经塌缩", "输出的幅度在变大", "网络里没有死单元"],
+    "correct": 2,
+    "why": "只能推出幅度在变大。z_std 把幅度和结构混在一起了:塌到 1 维同时幅度放大 10 倍,z_std 一样会涨(实测 8.3)。想说「没塌」必须看 srank。"
+  },
+  {
+    "q": "srank<sub>δ</sub> 的定义里,为什么要把前 k 个奇异值之和<b>除以奇异值总和</b>?",
+    "a": ["为了让它算得更快", "为了不受幅度影响", "为了让它总是整数", "为了兼容不同批量"],
+    "correct": 1,
+    "why": "归一化之后,把整个特征矩阵乘以 10 不改变 srank。这正是 z_std 缺的那一步——它没有归一化,所以幅度一变它就跟着变。"
+  },
+  {
+    "q": "DR3 那个可以直接当探针用的量,测的是什么?",
+    "a": ["每一维特征的方差大小", "激活为零的单元占比值", "特征矩阵奇异值的个数", "相邻两步特征的点积值"],
+    "correct": 3,
+    "why": "φ(s,a)ᵀφ(s′,a′) —— Bellman backup 两端那对状态-动作的特征点积。原文观察到优化器会「把网络推向更高的特征点积」,即让这一步和下一步在特征空间里越来越像。"
+  },
+  {
+    "q": "关于 dormant neuron(睡着的神经元)与秩塌缩的关系,哪个说法对?",
+    "a": ["两者完全是同一件事", "秩塌缩必然有死单元", "秩可以塌而无死单元", "死单元必然导致秩塌"],
+    "correct": 2,
+    "why": "相关但不等价。Lyle et al.(ICML 2023)明确说可塑性丧失「常在没有饱和单元的情况下发生」。所以三个探针要一起看,不能拿一个代替另一个。"
+  }
+]
+</script>
+
+<div class="footer-nav">
+  <ul>
+    <li>上两课:<code>teach/lessons/0001-four-routes.html</code> · <code>teach/lessons/0002-reward-density.html</code></li>
+    <li>下一课备选:① 共适应 vs capacity loss 是不是一件事 ② 正交稳定器(LayerNorm / reset / InFeR / ReDo)怎么选</li>
+    <li>完整术语表:<code>teach/reference/glossary.html</code></li>
+  </ul>
+</div>

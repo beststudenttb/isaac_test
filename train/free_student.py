@@ -41,6 +41,8 @@ parser.add_argument("--adapter-lr", type=float, default=None)     # 适配器单
 parser.add_argument("--freeze-adapter-at-stage3", action="store_true")  # teacher 退完后冻结适配器,只让 actor/critic 继续 PPO(分离"表征漂"和"策略漂")
 parser.add_argument("--num-envs", type=int, default=None)
 parser.add_argument("--noise", action="store_true")
+parser.add_argument("--multi", action="store_true", help="4 物体环境(红球/红方/蓝球/蓝方),配合 --target-slot")
+parser.add_argument("--target-slot", type=int, default=0, choices=(0,1,2,3), help="0=红球 1=红方 2=蓝球 3=蓝方")
 parser.add_argument("--show", action="store_true")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
@@ -141,7 +143,12 @@ def encoder_path() -> Path:
 
 def make_env() -> MDPStudentEnv:
     end_d_min, end_d_max, end_x_min, end_x_max = end_range()
-    env_cfg = ScoreNoiseStudentEnvCfg() if args_cli.noise else ScoreStudentEnvCfg()
+    if args_cli.multi:      # 4 物体:0=红球 1=红方 2=蓝球 3=蓝方
+        from src.multi_env import SLOT_NAMES, ScoreMultiStudentEnvCfg
+        env_cfg = ScoreMultiStudentEnvCfg()
+        print(f"[MULTI] 目标槽位 {args_cli.target_slot} = {SLOT_NAMES[int(args_cli.target_slot)]}", flush=True)
+    else:
+        env_cfg = ScoreNoiseStudentEnvCfg() if args_cli.noise else ScoreStudentEnvCfg()
     env_cfg.seed = int(args_cli.seed) if args_cli.seed is not None else int(cfg.SEED)
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
     env_cfg.stop_n = int(cfg.STOP_N)
@@ -161,11 +168,17 @@ def make_env() -> MDPStudentEnv:
     env_cfg.angle_deg = float(cfg.ANGLE_DEG)  # 表征长在 ±45 的数据上,任务三对齐它。
     if args_cli.score_mode:
         env_cfg.score_mode = str(args_cli.score_mode)
-    env_cfg.chase_blue = bool(args_cli.chase_blue)
+    if args_cli.multi:
+        env_cfg.target_slot = int(args_cli.target_slot)
+    else:
+        env_cfg.chase_blue = bool(args_cli.chase_blue)
     env_cfg.end_d_min = end_d_min
     env_cfg.end_d_max = end_d_max
     env_cfg.end_x_min = end_x_min
     env_cfg.end_x_max = end_x_max
+    if args_cli.multi:
+        from src.multi_env import make_score_multi_student_env
+        return make_score_multi_student_env(env_cfg)
     make_env_fn = make_score_noise_student_env if args_cli.noise else make_score_student_env
     return make_env_fn(env_cfg)
 
@@ -332,6 +345,11 @@ def main() -> None:
             return env.cfg.image_width * 0.5 - _fx * _l / torch.clamp(_f, min=1e-6)
         _v = _lab["dist"] > 0.3
         if bool(_v.any()):
+            if hasattr(env, "extra_xy"):    # 4 物体:逐槽报 |标签-该物体|,指定槽位应 ≈0,其余应很大
+                from src.multi_env import SLOT_NAMES
+                _e4 = [float((_lab["px_x"][_v] - _proj(env.slot_xy()[:, _k])[_v]).abs().mean()) for _k in range(4)]
+                print(f"[SELFCHECK] MULTI target_slot={env.cfg.target_slot} |标签-各槽|px = "
+                      + "  ".join(f"{_n}:{_x:.2f}" for _n, _x in zip(SLOT_NAMES, _e4)), flush=True)
             _er = float((_lab["px_x"][_v] - _proj(env.target_xy)[_v]).abs().mean())
             _eb = float((_lab["px_x"][_v] - _proj(env.noise_xy)[_v]).abs().mean()) if hasattr(env, "noise_xy") else float("nan")
             print(f"[SELFCHECK] chase_blue={getattr(env.cfg, 'chase_blue', False)} 有干扰球={hasattr(env, 'noise_xy')} "

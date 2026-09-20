@@ -1,0 +1,188 @@
+<meta charset="utf-8">
+<title>课 02:开着增广为什么还是崩</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+<link rel="stylesheet" href="../assets/quiz.css">
+<script src="../assets/quiz.js"></script>
+
+<p class="kicker">课 02 · 像素 RL 的表征问题</p>
+<h1>开着增广为什么还是崩</h1>
+<p class="subtitle">约 12 分钟。先热身两题 → 读 → 做 4 道题。</p>
+
+<div class="takeaway">
+  <p><strong>这节课你会拿到一张三问检查表。</strong>以后看到一篇论文说"我们端到端从像素学会了",
+  问三个问题就能判断:它那根拐杖搬到你的任务上还灵不灵。</p>
+  <p>顺带解决上一课留下的那个问题——你的 <code>sac_pixels</code> 明明一直开着增广,为什么还是崩。</p>
+</div>
+
+<h2>热身:先回忆两下</h2>
+
+<p>不许往回翻上一课。答错比翻回去更有用。</p>
+
+<div class="quiz" data-quiz-src="#quiz-warm"></div>
+
+<h2>拐杖是在什么路面上测的</h2>
+
+<div class="analogy">
+  <span class="label">类比</span>
+  <p>有人做了一款防滑鞋底,在湿瓷砖上做了大量测试,数据很漂亮。你穿着它上了冰面,摔了。
+  这不能说明防滑鞋底是假的——只能说明<strong>它的有效性是在湿瓷砖上验证的</strong>,
+  而冰面是另一种路面。</p>
+  <p>增广、encoder 梯度平滑、LayerNorm 这些拐杖,全都是在一类特定"路面"上测出来的。
+  而你的任务不是那类路面。</p>
+</div>
+
+<p>上一课那张"每个成功都拄着拐杖"的表,还有一列我故意没写:<strong>它们在哪测的</strong>。</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>成功案例</th><th>拐杖</th><th>验证环境</th></tr></thead>
+  <tbody>
+    <tr><td>DrQ / RAD</td><td>输入增广</td><td>DeepMind Control、Atari</td></tr>
+    <tr><td>DrQ-v2</td><td>增广 + DDPG/n-step + 噪声调度</td><td>DeepMind Control(含 humanoid)</td></tr>
+    <tr><td>A-LIX</td><td>encoder 梯度平滑</td><td>DeepMind Control、Atari</td></tr>
+    <tr><td>BRO</td><td>强正则 + 放大 critic</td><td>DeepMind Control(Dog / Humanoid)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>DeepMind Control 这套基准的一个共同点:<strong>奖励几乎每一步都有</strong>。
+让机器人跑起来,速度越快每步给的越多;让手臂靠近目标,靠得越近每步给的越多。
+一条 episode 里有一千个有信息的时刻。</p>
+
+<h2>稀疏奖励下,网络会先学不动</h2>
+
+<div class="analogy">
+  <span class="label">类比</span>
+  <p>让一个学生连做三万道练习题,而这三万道题的答案<em>全是零</em>。他会很快学到一个规律:写零就对。
+  等你终于给他一道答案不是零的真题时——他已经不会算了。不是懒,是"算"这个能力在那三万道题里
+  被磨掉了。</p>
+</div>
+
+<p>这件事在文献里有名字,叫 <strong>capacity loss</strong>(Lyle, Rowland &amp; Dabney, ICLR 2022)。
+论文的结论是:网络在一串不停变化的目标上训练,会逐渐丧失拟合新目标的能力;
+而且<strong>在稀疏奖励下最严重</strong>——因为早期很长一段时间里,唯一要拟合的目标就是"近零",
+表征先塌了,等真信号出现时已经学不动。</p>
+
+<p>把这个放回你的 v1 任务:成功要求 <code>in_zone &amp; max|a| &lt; 0.05</code> 同时成立。
+在 σ=0.3 的探索噪声下,三维动作同时落进 ±0.05 的概率大约是<strong>千分之二</strong>。
+也就是说,critic 在很长时间里看到的目标,几乎全是"没成功"。这正是那个学生的三万道零。</p>
+
+<p class="aside">诚实说明:"奖励密度是分水岭"这句话是我把几篇的证据<strong>综合</strong>出来的,
+不是某一篇的原话。有原文支撑的部分是:Lyle et al. 明确说稀疏奖励下 capacity loss 最严重;
+以及那些拐杖的实验环境确实都是稠密奖励基准。综合的部分是把两件事连起来。
+写论文时要这样分开表述,别把综合写成引用。</p>
+
+<h2>所以增广不背这个锅</h2>
+
+<p>增广治的是<strong>过拟合</strong>——A-LIX 那篇论证过,它起的是给 encoder 梯度做平滑的作用,
+防止 CNN 对自己编出来的目标死记硬背。这是个真问题,增广是有效的解。</p>
+
+<p>但增广治不了"信号本身长期不存在"。你的 <code>sac_pixels</code> 崩掉,不是因为缺正则
+——它拄着拐杖——而是因为它站的是冰面:</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>维度</th><th>DeepMind Control</th><th>你的 v1 停靠任务</th></tr></thead>
+  <tbody>
+    <tr><td>奖励密度</td><td>几乎每步都有</td><td>成功事件采样概率约千分之二</td></tr>
+    <tr><td>成功精度</td><td>到达附近即可</td><td>三维动作同时进 ±0.05 的窗口</td></tr>
+    <tr><td>终止结构</td><td>定长,或明确失败</td><td>375 步里只有 1 个真终止 → 带锚样本约千分之三</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>三项全在难的那一侧。所以那些拐杖的验证条件,在你这儿一条都不成立。</p>
+
+<h2>三问检查表</h2>
+
+<p>以后看到任何一个"端到端从像素学会了"的方法,在决定要不要搬之前,问三句:</p>
+
+<ol>
+  <li><strong>奖励多密?</strong>每步都有信号,还是要撞对一个罕见事件才有?</li>
+  <li><strong>成功要多精确?</strong>"到附近就算",还是"多个维度同时进一个很小的窗口"?</li>
+  <li><strong>一条 episode 里有几个真终止?</strong>带 <code>discount=0</code> 的样本占多少?</li>
+</ol>
+
+<p>三个都在容易那侧 → 它的结论大概能搬。有一个在难那侧 → 至少要重新验证。
+三个都在难那侧 → 别指望,先改任务或者换路线。</p>
+
+<p>这张表也解释了你自己那条 <code>spr_z</code> 为什么能成:走路线 D 之后,
+视觉网络根本不由 TD 梯度训练,上面三个问题<strong>对表征学习不再适用</strong>——
+它们只影响策略和价值头,而那两个是小 MLP,塌不塌无关紧要。</p>
+
+<h2>检索练习</h2>
+
+<div class="quiz" data-quiz-src="#quiz-main"></div>
+
+<h2>去读这一篇</h2>
+
+<p><strong>Lyle, Rowland &amp; Dabney, <em>Understanding and Preventing Capacity Loss in
+Reinforcement Learning</em>, ICLR 2022 ·
+<a href="https://arxiv.org/abs/2204.09560">arxiv.org/abs/2204.09560</a></strong></p>
+
+<p>只看摘要和引言就够。要找的那句话是:capacity loss 在稀疏奖励环境里最严重,
+因为网络长期只在拟合近零目标。他们的解法叫 InFeR——把一部分特征回归到初始化值,
+本质是"别让表征塌"。读的时候留意一件事:这是<strong>与路线正交</strong>的稳定器,
+你可以把它叠在任何一条路线上。</p>
+
+<div class="ask">
+  <strong>随时问我。</strong>比如:InFeR 具体怎么做的、能不能叠到我们的线上?
+  「表征塌了」有没有可以直接看的指标(有——你已经在记 <code>z_std</code> 了,
+  但那个指标其实测不到真正想测的东西,想聊可以展开)?
+  下一课备选:TD 梯度自己带的那股"把表征学歪"的压力(共适应与 rank collapse),
+  以及为什么它和 capacity loss 是两件不同的事。
+</div>
+
+<script type="application/json" id="quiz-warm">
+[
+  {
+    "q": "DrQ-v2(增广 + DDPG/n-step + 探索噪声调度,encoder 只吃 critic 梯度)属于哪条路线?",
+    "a": ["路线 A", "路线 B", "路线 C", "路线 D"],
+    "correct": 2,
+    "why": "有增广 = 路线 C。判断只看一件事:encoder 的参数出现在哪个 loss 的反向传播里,以及输入有没有被增广。"
+  },
+  {
+    "q": "R3M(Ego4D 视频预训练,之后当冻结的感知模块用)属于哪条路线?",
+    "a": ["路线 A", "路线 B", "路线 C", "路线 D"],
+    "correct": 3,
+    "why": "冻结 = RL 梯度完全不进 encoder = 路线 D,和 ATC / PVR / MVP / VIP 以及你的 <code>spr_z</code> 同一路。"
+  }
+]
+</script>
+
+<script type="application/json" id="quiz-main">
+[
+  {
+    "q": "capacity loss(学着学着就学不动了)在什么条件下最严重?",
+    "a": ["奖励稠密时最严重", "奖励稀疏时最严重", "网络太小时最严重", "学习率高时最严重"],
+    "correct": 1,
+    "why": "稀疏时最严重。Lyle et al. ICLR 2022 的原因分析:稀疏奖励下网络早期长期只在拟合「近零」这一个目标,表征先塌,等真信号出现已经学不动。"
+  },
+  {
+    "q": "DrQ / DrQ-v2 / RAD / A-LIX 这些拐杖,主要是在什么环境上验证的?",
+    "a": ["稀疏奖励仿真基准", "稠密奖励真机实验", "稠密奖励仿真基准", "稀疏奖励真机实验"],
+    "correct": 2,
+    "why": "DeepMind Control 与 Atari,几乎每步都有奖励。这不是黑它们——只是说它们的有效性是在这类「路面」上验证的,搬到稀疏精确任务上需要重新验证。"
+  },
+  {
+    "q": "你的 v1 任务里,replay batch 里带「终止锚」(discount = 0)的样本大约占多少?",
+    "a": ["百分之三左右", "十分之三左右", "一半以上左右", "千分之三左右"],
+    "correct": 3,
+    "why": "约千分之三(实测 coadapt 0.35%、pixels 0.39%、spr_z 0.87%)。一条 episode 375 步只有 1 个真终止步,其余全靠自举。这就是 Q 没东西钉住、能一路飘到 45 的直接原因。"
+  },
+  {
+    "q": "为什么「开着增广还是崩」不能怪增广没用?",
+    "a": ["增广只有在真机上才起作用", "增广治的是过拟合不是稀疏", "增广必须配合自监督才有效", "增广治的是稀疏不是过拟合"],
+    "correct": 1,
+    "why": "增广(A-LIX 论证过它本质是 encoder 梯度平滑正则)治的是「对自己编的目标死记硬背」这个过拟合问题。它治不了「信号本身长期不存在」。两个是不同的病,拄对拐杖也治不了另一种。"
+  }
+]
+</script>
+
+<div class="footer-nav">
+  <ul>
+    <li>上一课:<code>teach/lessons/0001-four-routes.html</code>(四条路线 + 路线 A 一篇成功案例都没有)</li>
+    <li>下一课备选:TD 梯度自带的表征退化压力 —— 共适应、rank collapse,与 capacity loss 的区别</li>
+    <li>完整术语表:<code>teach/reference/glossary.html</code></li>
+  </ul>
+</div>

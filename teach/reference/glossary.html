@@ -1,0 +1,169 @@
+<meta charset="utf-8">
+<title>术语表:像素 RL 与表征学习</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+<style>
+  td.zh { font-weight: 600; white-space: nowrap; }
+  td.en { font-family: ui-monospace, Menlo, monospace; font-size: .85rem; }
+  .src { font-size: .82rem; color: var(--ink-soft); }
+  .mine { border-left: 3px solid var(--accent); }
+</style>
+
+<p class="kicker">Reference · 术语表</p>
+<h1>术语表</h1>
+<p class="subtitle">左边是平常说法,中间是写论文要用的英文术语。查术语用这页,不用翻课程。</p>
+
+<div class="takeaway">
+  <p><strong>怎么用这页:</strong>写论文时从"平常说法"找到你想表达的意思,抄右边的英文术语和出处。
+  学习时反过来——遮住左边,看英文能不能说出人话。</p>
+</div>
+
+<h2>四条路线(本课程的分法)</h2>
+
+<p>这个 A/B/C/D 的编号是<strong>本课程自己的分法</strong>,不是文献里的标准叫法,写论文时别直接用编号,
+要展开说"encoder 由什么信号训练"。分法的依据只有一个问题:<em>视觉网络的参数被谁的梯度改?</em></p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>路线</th><th>平常说法</th><th>英文</th><th>代表工作</th></tr></thead>
+  <tbody>
+    <tr><td class="route">A</td><td class="zh">裸着用 TD 梯度训视觉</td>
+        <td class="en">end-to-end TD, no regularization</td>
+        <td class="src">没有成功案例(见 <a href="../lessons/0001-four-routes.html">课 01</a>)</td></tr>
+    <tr><td class="route">B</td><td class="zh">TD 梯度 + 自监督一起训</td>
+        <td class="en">joint TD + auxiliary SSL loss</td>
+        <td class="src">SAC+AE, CURL, SPR</td></tr>
+    <tr><td class="route">C</td><td class="zh">TD 梯度 + 输入增广当正则</td>
+        <td class="en">TD with data-augmentation regularization</td>
+        <td class="src">DrQ, DrQ-v2, RAD</td></tr>
+    <tr><td class="route">D</td><td class="zh">先单独练眼力,再锁住</td>
+        <td class="en">decoupled / frozen pre-trained representation</td>
+        <td class="src">ATC, PVR, R3M, MVP, VIP</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>失败模式的名字</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>平常说法</th><th>英文术语</th><th>一句话</th><th>出处</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="zh">三件事凑一起会发散</td>
+      <td class="en">deadly triad</td>
+      <td>函数近似 + 自举 + off-policy 同时在场时,价值估计没有收敛保证。注意原文的实证结论是
+          「发散不是必然」,它是总源头而非直接证据。</td>
+      <td class="src">van Hasselt+ 2018,
+          <a href="https://arxiv.org/abs/1812.02648">1812.02648</a>(preprint)</td>
+    </tr>
+    <tr>
+      <td class="zh">视觉版的那三件事</td>
+      <td class="en">visual deadly triad</td>
+      <td>TD 学习 + 卷积 encoder + 中等幅度奖励凑一起,CNN 会长出不平滑、过度判别的特征。</td>
+      <td class="src">Cetin+ ICML 2022,
+          <a href="https://arxiv.org/abs/2207.00986">2207.00986</a></td>
+    </tr>
+    <tr>
+      <td class="zh">对自己编的答案死记硬背</td>
+      <td class="en">catastrophic self-overfitting</td>
+      <td>critic 的学习目标是自己算出来的,于是它对自己生成的目标过拟合,越练越离谱。</td>
+      <td class="src">同上(A-LIX)</td>
+    </tr>
+    <tr>
+      <td class="zh">网络偷偷把表征学歪</td>
+      <td class="en">feature co-adaptation<br>(implicit regularization)</td>
+      <td>SGD 的隐式正则在监督学习里有益,在 TD 下变有害:把 Bellman 两端的 (s,a) 表征推向
+          共适应、点积变大、趋于塌缩。所以价值学习需要<strong>显式</strong>正则。</td>
+      <td class="src">DR3, Kumar+ ICLR 2022,
+          <a href="https://arxiv.org/abs/2112.04716">2112.04716</a></td>
+    </tr>
+    <tr>
+      <td class="zh">特征越练越"扁"</td>
+      <td class="en">rank collapse /<br>implicit under-parameterization</td>
+      <td>自举与梯度优化的病态互动使价值网络特征矩阵有效秩持续下降,梯度步越多表达力越差。</td>
+      <td class="src">Kumar+ ICLR 2021,
+          <a href="https://arxiv.org/abs/2010.14498">2010.14498</a></td>
+    </tr>
+    <tr>
+      <td class="zh">学着学着就学不动了</td>
+      <td class="en">capacity loss</td>
+      <td>在一串不停变的目标上训练,网络逐渐丧失拟合新目标的能力。<strong>稀疏奖励下最严重</strong>:
+          早期长期只能拟合近零目标,表征先塌了,等真信号来了已经学不动。</td>
+      <td class="src">Lyle+ ICLR 2022,
+          <a href="https://arxiv.org/abs/2204.09560">2204.09560</a></td>
+    </tr>
+    <tr>
+      <td class="zh">网络失去可塑性</td>
+      <td class="en">plasticity loss</td>
+      <td>上一条的后续机制分析:与 loss landscape 曲率变化深度相关,且常在没有饱和单元时就发生。</td>
+      <td class="src">Lyle+ ICML 2023,
+          <a href="https://arxiv.org/abs/2303.01486">2303.01486</a></td>
+    </tr>
+    <tr>
+      <td class="zh">被开局的烂数据带偏</td>
+      <td class="en">primacy bias</td>
+      <td>过拟合早期交互、忽视后期证据;周期性重置部分网络(保留 buffer)有一致增益。</td>
+      <td class="src">Nikishin+ ICML 2022,
+          <a href="https://arxiv.org/abs/2205.07802">2205.07802</a></td>
+    </tr>
+    <tr>
+      <td class="zh">Q 值对没见过的动作乱报价</td>
+      <td class="en">catastrophic overestimation</td>
+      <td>critic 对数据外动作外推出离谱高值。LayerNorm 能让 Q 被权重范数界住,从而压住它。</td>
+      <td class="src">RLPD §4.2, Ball+ ICML 2023,
+          <a href="https://arxiv.org/abs/2302.02948">2302.02948</a></td>
+    </tr>
+    <tr>
+      <td class="zh">换个种子结果差一个量级</td>
+      <td class="en">seed variance;<br>报告规范:IQM</td>
+      <td>少量 run 的 mean/median 点估计不可靠。要报区间估计、performance profiles、
+          interquartile mean (IQM)、stratified bootstrap 置信区间。</td>
+      <td class="src">Agarwal+ NeurIPS 2021,
+          <a href="https://arxiv.org/abs/2108.13264">2108.13264</a></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2>本项目自己的说法(文献里没有,内部沟通用)</h2>
+
+<div class="table-wrap">
+<table class="mine">
+  <thead><tr><th>本项目说法</th><th>意思</th><th>对应到文献</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="zh">终止锚</td>
+      <td>replay batch 里 <code>discount = 0</code> 的那些样本(真正结束的那一步)。它们是唯一
+          不靠自举、直接把 Q 钉在真实回报上的样本。本项目实测这类样本只占 0.35%–0.87%。</td>
+      <td class="src">没有标准术语。相关概念:bootstrapping、
+          absorbing state、time-limit handling(Pardo+ 2018 的 partial-episode bootstrapping)</td>
+    </tr>
+    <tr>
+      <td class="zh">冷启动死锁</td>
+      <td>成功需要一个罕见动作事件,而策略不产生它 → buffer 里没有成功样本 → critic 学不出来
+          → 策略更不会产生它。</td>
+      <td class="src">最接近的是 capacity loss(稀疏奖励下表征先塌)与 exploration 文献;
+          本项目的具体形式是自己的</td>
+    </tr>
+    <tr>
+      <td class="zh">拐杖</td>
+      <td>路线 A 想成功必须带的东西:增广、encoder 梯度平滑、LayerNorm、周期 reset、
+          阻断 actor 梯度——至少一样。</td>
+      <td class="src">本课程说法;逐项见上表</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="ask">
+  <strong>有疑问直接问我。</strong>这页是压缩过的,任何一条想展开(为什么这么说、原文在哪一节、
+  和我们项目哪个现象对得上)都可以让我讲。术语翻译得别扭也告诉我,这页会改。
+</div>
+
+<div class="footer-nav">
+  <ul>
+    <li><a href="../lessons/0001-four-routes.html">课 01:一个问题分清四条路线</a></li>
+    <li><a href="../MISSION.md">MISSION.md</a> · <a href="../RESOURCES.md">RESOURCES.md</a></li>
+    <li>完整核实版文献清单(23 篇):<code>summary/2026_07_30_pixel_rl_representation_survey.md</code></li>
+  </ul>
+</div>

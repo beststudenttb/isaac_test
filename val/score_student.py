@@ -26,7 +26,10 @@ parser.add_argument("--encoder-root", default=None)
 parser.add_argument("--run-tag", default="")  # 训练时的 --tag,拼进 run 目录名
 parser.add_argument("--score-mode", default=None, choices=("angle", "cam", "pixel"), help="奖励与 stop 判定的度量,须与该表征对应的 teacher 一致")
 parser.add_argument("--chase-blue", action="store_true", help="改追蓝球(干扰球),红球留在场上当干扰;表征不变")
+parser.add_argument("--noise-shape", default="", choices=("","sphere","cube","cone"), help="把干扰物换成别的形状再评估(外接盒与球相同)。留空=不动。")
 parser.add_argument("--noise-color", default="", help="把干扰球改成别的颜色再评估(只改外观,不改标签/奖励)。留空=不动。例:red / green / grey")
+parser.add_argument("--multi", action="store_true", help="4 物体环境(红球/红方/蓝球/蓝方),配合 --target-slot")
+parser.add_argument("--target-slot", type=int, default=0, choices=(0,1,2,3), help="0=红球 1=红方 2=蓝球 3=蓝方")
 parser.add_argument("--adapter", action="store_true")
 parser.add_argument("--adapter-hidden", type=int, default=0)
 parser.add_argument("--seed", type=int, default=None)
@@ -57,7 +60,15 @@ ACTIVATIONS = {"tanh": nn.Tanh, "relu": nn.ReLU, "elu": nn.ELU}
 
 
 def main() -> None:
-    env_cfg = ScoreNoiseStudentEnvCfg()
+    if args_cli.multi:      # 4 物体:0=红球 1=红方 2=蓝球 3=蓝方
+        from src.multi_env import SLOT_NAMES, ScoreMultiStudentEnvCfg, make_score_multi_student_env
+        env_cfg = ScoreMultiStudentEnvCfg()
+        env_cfg.target_slot = int(args_cli.target_slot)
+        make_env_fn = make_score_multi_student_env
+        print(f"[MULTI] 目标槽位 {args_cli.target_slot} = {SLOT_NAMES[int(args_cli.target_slot)]}", flush=True)
+    else:
+        env_cfg = ScoreNoiseStudentEnvCfg()
+        make_env_fn = make_score_noise_student_env
     env_cfg.seed = 123
     env_cfg.episode_length_s = float(cfg.EPISODE_S)
     env_cfg.stop_n = int(cfg.STOP_N)
@@ -72,10 +83,14 @@ def main() -> None:
     env_cfg.angle_deg = float(cfg.ANGLE_DEG)
     if args_cli.score_mode:
         env_cfg.score_mode = str(args_cli.score_mode)
-    env_cfg.chase_blue = bool(args_cli.chase_blue)
+    if not args_cli.multi:
+        env_cfg.chase_blue = bool(args_cli.chase_blue)
+    if args_cli.noise_shape and not args_cli.multi:
+        env_cfg.noise_shape = str(args_cli.noise_shape)
+        print(f"[NOISE-SHAPE] 干扰物形状 -> {args_cli.noise_shape}", flush=True)
     env_cfg.end_d_min = env_cfg.end_d_max = float(cfg.END_D_MIN)
     env_cfg.end_x_min = env_cfg.end_x_max = float(cfg.END_X_MIN)
-    env = make_score_noise_student_env(env_cfg)
+    env = make_env_fn(env_cfg)
     if args_cli.noise_color:   # 只改干扰球的漫反射颜色;标签、奖励、停车判定一律不动
         _COL = {"red": (1.0, 0.0, 0.0), "blue": (0.0, 0.1, 1.0), "green": (0.0, 0.72, 0.1),
                 "grey": (0.5, 0.5, 0.5), "orange": (1.0, 0.45, 0.0)}

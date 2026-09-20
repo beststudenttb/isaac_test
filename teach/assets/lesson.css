@@ -1,0 +1,300 @@
+/* 共享课程样式表 —— 所有 lessons/*.html 与 reference/*.html 链接同一份,整套课是一门课。
+ *
+ * 视觉方向:技术图纸 / 示波器。冷中性纸底、单一"信号青"作强调、路线字母当接线端子标号。
+ * 依据是主题本身——这门课讲的就是"梯度这个信号进不进视觉网络",所以用接线/信号的语汇,
+ * 而不是人文杂志的米白+衬线+砖红(那是当前 AI 生成设计最常见的模板,刻意避开)。
+ *
+ * 颜色全部走 token:@media (prefers-color-scheme) 跟随系统,:root[data-theme] 覆盖手动切换,
+ * 组件只引用 token、绝不在 media query 里直接写组件样式。
+ */
+
+:root {
+  --ground:      #f5f7f8;   /* 冷纸白,偏蓝灰,不是米白 */
+  --ground-sunk: #eaeef1;   /* 表头/代码底 */
+  --ink:         #13181d;   /* 冷近黑 */
+  --ink-soft:    #5b6670;
+  --rule:        #d5dce2;
+  --accent:      #0d6a86;   /* 信号青 —— 全页唯一强调色 */
+  --accent-tint: #e2eef2;
+  --ok:          #14664c;   /* 语义色,与强调色分开 */
+  --no:          #a02c22;
+
+  --measure: 62ch;
+
+  --display: ui-sans-serif, -apple-system, "Segoe UI", "Helvetica Neue",
+             "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
+  --body: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia,
+          "Songti SC", "Noto Serif CJK SC", serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", "DejaVu Sans Mono", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground:      #0d1215;
+    --ground-sunk: #161d22;
+    --ink:         #dbe3e8;
+    --ink-soft:    #8a959d;
+    --rule:        #242c32;
+    --accent:      #52bcd9;
+    --accent-tint: #12262d;
+    --ok:          #5cc79b;
+    --no:          #e3796b;
+  }
+}
+
+/* 观看者手动切换主题时必须能覆盖 media query —— 两个方向都要写 */
+:root[data-theme="dark"] {
+  --ground:      #0d1215;
+  --ground-sunk: #161d22;
+  --ink:         #dbe3e8;
+  --ink-soft:    #8a959d;
+  --rule:        #242c32;
+  --accent:      #52bcd9;
+  --accent-tint: #12262d;
+  --ok:          #5cc79b;
+  --no:          #e3796b;
+}
+:root[data-theme="light"] {
+  --ground:      #f5f7f8;
+  --ground-sunk: #eaeef1;
+  --ink:         #13181d;
+  --ink-soft:    #5b6670;
+  --rule:        #d5dce2;
+  --accent:      #0d6a86;
+  --accent-tint: #e2eef2;
+  --ok:          #14664c;
+  --no:          #a02c22;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0 auto;
+  padding: 3rem 1.5rem 5rem;
+  max-width: var(--measure);
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 1.04rem;
+  line-height: 1.75;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ---------- 标题与题头 ---------- */
+
+h1 {
+  font-family: var(--display);
+  font-size: clamp(1.6rem, 4.5vw, 2.05rem);
+  font-weight: 640;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  text-wrap: balance;
+  margin: 0 0 .5rem;
+}
+
+h2 {
+  font-family: var(--display);
+  font-size: 1.18rem;
+  font-weight: 620;
+  letter-spacing: -0.005em;
+  text-wrap: balance;
+  margin: 3.2rem 0 1rem;
+  padding-top: .7rem;
+  border-top: 1px solid var(--rule);
+}
+
+h3 {
+  font-family: var(--display);
+  font-size: 1.02rem;
+  font-weight: 620;
+  margin: 2rem 0 .5rem;
+}
+
+.kicker {
+  font-family: var(--mono);
+  font-size: .7rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 .9rem;
+}
+
+.subtitle {
+  font-family: var(--display);
+  font-size: .95rem;
+  color: var(--ink-soft);
+  margin: 0 0 2.4rem;
+}
+
+/* ---------- 正文元素 ---------- */
+
+p { margin: 0 0 1.1rem; }
+ul, ol { margin: 0 0 1.1rem; padding-left: 1.35rem; }
+li { margin-bottom: .5rem; }
+li:last-child { margin-bottom: 0; }
+
+strong { font-weight: 650; }
+em { font-style: italic; }
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+a:hover { border-bottom-color: var(--accent); background: var(--accent-tint); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+code, kbd {
+  font-family: var(--mono);
+  font-size: .86em;
+  background: var(--ground-sunk);
+  padding: .12em .34em;
+  border-radius: 2px;
+}
+
+/* 「先给结论」—— 每节课开头说明本课产出。左侧信号条 */
+.takeaway {
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+  border-left: 2px solid var(--accent);
+  padding: .1rem 0 .1rem 1.1rem;
+  margin: 0 0 2.4rem;
+}
+.takeaway p { margin: 0; }
+
+/* 日常类比 —— 教学法要求:先讲明白,再命名 */
+.analogy {
+  display: flex;
+  flex-direction: column;
+  gap: .8rem;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 1.1rem 1.2rem;
+  margin: 1.6rem 0;
+  background: var(--ground-sunk);
+}
+.analogy > * { margin: 0; }
+.analogy > .label {
+  font-family: var(--mono);
+  font-size: .68rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* 本课论点 —— 整课就围绕这一个问题,给它一块图纸式的说明牌 */
+.thesis {
+  margin: 2rem 0;
+  padding: 1.4rem 1rem;
+  border-top: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+  text-align: center;
+}
+.thesis .q {
+  font-family: var(--display);
+  font-size: clamp(1.05rem, 3.4vw, 1.3rem);
+  font-weight: 620;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  text-wrap: balance;
+  margin: 0;
+}
+.thesis .hint {
+  font-family: var(--mono);
+  font-size: .68rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: .7rem 0 0;
+}
+
+.aside {
+  font-size: .93rem;
+  color: var(--ink-soft);
+  border-left: 1px solid var(--rule);
+  padding-left: 1rem;
+  margin: 1.4rem 0;
+}
+
+/* ---------- 表格 ---------- */
+
+.table-wrap { overflow-x: auto; margin: 1.5rem 0; }
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: var(--display);
+  font-size: .9rem;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+}
+th, td {
+  text-align: left;
+  padding: .55rem .7rem;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+th {
+  font-family: var(--mono);
+  font-size: .72rem;
+  font-weight: 500;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--ink-soft);
+  white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: none; }
+
+/* 路线字母 = 接线端子标号。字母而非 01/02/03:四条路线是分类,不是流程顺序 */
+td.route {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+  width: 2.5rem;
+}
+td.zh { font-weight: 620; }
+td.en, .src { font-family: var(--mono); font-size: .78rem; }
+.src { color: var(--ink-soft); }
+
+/* ---------- 页脚 ---------- */
+
+.ask {
+  margin-top: 2.6rem;
+  padding: 1rem 1.2rem;
+  border: 1px dashed var(--rule);
+  border-radius: 3px;
+  font-size: .94rem;
+  color: var(--ink-soft);
+}
+.ask strong { color: var(--ink); }
+
+.footer-nav {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+  font-family: var(--display);
+  font-size: .9rem;
+  color: var(--ink-soft);
+}
+.footer-nav ul { padding-left: 1.2rem; margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* ---------- 打印 ---------- */
+
+@media print {
+  :root {
+    --ground: #fff; --ground-sunk: #f2f2f2; --ink: #000; --ink-soft: #444;
+    --rule: #bbb; --accent: #000; --accent-tint: #f0f0f0;
+  }
+  body { padding: 0; max-width: none; font-size: 10.5pt; }
+  h2 { page-break-after: avoid; }
+  .quiz-q, .analogy, .thesis, .ask, .footer-nav { page-break-inside: avoid; }
+  a { border-bottom: none; }
+  a[href^="http"]::after { content: " (" attr(href) ")"; font-size: .78em; color: #555; }
+}
