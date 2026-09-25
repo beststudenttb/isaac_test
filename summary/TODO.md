@@ -1,5 +1,7 @@
 # TODO
 
+> **[2026-09-25 会话迁移注]** 当前计划以 `summary/ACTIVE_PLAN.md` 为准。本文件'当前线'一节里:`render_distract.py` 已跑完(`data_distract/`);Ax 84.4、Aw de 4.597 m 是 last 格,主口径值见 `CURRENT_STATE.md` V5;其余旧线均为历史。
+
 ## 当前线:行为监督表征(2026-09,唯一在跑的线)
 
 状态见 [`2026_09_17_status.md`](2026_09_17_status.md)。

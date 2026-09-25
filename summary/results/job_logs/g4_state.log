@@ -1,0 +1,595 @@
+[09-14 19:24:34] === 阶段1:teacher(每组合 2 种子),两卡按下标奇偶分,互不重叠 ===
+[09-14 19:24:34] START teacher diam_cam_s1 gpu0
+[09-14 19:24:34] START teacher diam_cam_s2 gpu1
+[09-14 19:28:31] === 阶段1:teacher(每组合 2 种子),两卡按下标奇偶分,互不重叠 ===
+[09-14 19:28:31] START teacher diam_cam_s1 gpu0
+[09-14 19:28:31] START teacher diam_cam_s2 gpu1
+[09-14 19:28:36] === 队列 worker 启动(两卡) ===
+[09-14 19:36:42] END   teacher diam_cam_s1 rc=0
+[09-14 19:36:42] START teacher diam_angle_s1 gpu0
+[09-14 19:38:19] END   teacher diam_cam_s2 rc=0
+[09-14 19:38:19] START teacher diam_angle_s2 gpu1
+[09-14 19:44:46] END   teacher diam_angle_s1 rc=0
+[09-14 19:44:46] START teacher ang_cam_s1 gpu0
+[09-14 19:46:39] END   teacher diam_angle_s2 rc=0
+[09-14 19:46:39] START teacher ang_cam_s2 gpu1
+[09-14 19:52:56] END   teacher ang_cam_s1 rc=0
+[09-14 19:52:56] START teacher ang_angle_s1 gpu0
+[09-14 19:55:00] END   teacher ang_cam_s2 rc=0
+[09-14 19:55:00] START teacher ang_angle_s2 gpu1
+[09-14 20:01:07] END   teacher ang_angle_s1 rc=0
+[09-14 20:03:19] END   teacher ang_angle_s2 rc=0
+[09-14 20:03:19] === 阶段2:取优 + 采集 + 四臂表征 ===
+[09-14 20:04:58] [diam_cam s1] v1=100.0 回报=289.4
+[09-14 20:06:28] [diam_angle s1] v1=100.0 回报=273.9
+[09-14 20:07:57] [diam_cam s2] v1=100.0 回报=291.3
+[09-14 20:07:57] [diam_cam] 取 seed 2
+[09-14 20:07:58] START collect diam_cam gpu0 (seed 2)
+[09-14 20:09:28] [diam_angle s2] v1=100.0 回报=276.2
+[09-14 20:09:28] [diam_angle] 取 seed 2
+[09-14 20:09:28] START collect diam_angle gpu1 (seed 2)
+[09-14 20:19:06] END   collect diam_cam rc=0
+[09-14 20:19:06] START stage1 diam_cam gpu0 (A/V/R/sup, sup-target=cam)
+[09-14 20:20:59] END   collect diam_angle rc=0
+[09-14 20:20:59] START stage1 diam_angle gpu1 (A/V/R/sup, sup-target=cam)
+[09-14 20:40:53] === 队列 worker 启动(两卡) ===
+[09-14 20:43:44] END   stage1 diam_cam rc=0
+[09-14 20:45:23] [ang_cam s1] v1=100.0 回报=280.2
+[09-14 20:46:28] END   stage1 diam_angle rc=0
+[09-14 20:47:01] [ang_cam s2] v1=100.0 回报=290.2
+[09-14 20:47:01] [ang_cam] 取 seed 2
+[09-14 20:47:01] START collect ang_cam gpu0 (seed 2)
+[09-14 20:48:32] [ang_angle s1] v1=100.0 回报=282.3
+[09-14 20:51:32] [ang_angle s2] v1=100.0 回报=308.2
+[09-14 20:51:32] [ang_angle] 取 seed 2
+[09-14 20:51:32] START collect ang_angle gpu1 (seed 2)
+[09-14 20:58:08] END   collect ang_cam rc=0
+[09-14 20:58:08] START stage1 ang_cam gpu0 (A/V/R/sup, sup-target=ang)
+[09-14 21:01:41] END   collect ang_angle rc=0
+[09-14 21:01:41] START stage1 ang_angle gpu1 (A/V/R/sup, sup-target=ang)
+[09-14 21:22:43] END   stage1 ang_cam rc=0
+[09-14 21:27:11] END   stage1 ang_angle rc=0
+[09-14 21:27:12] === 前两阶段完成,PPO 交给队列 worker ===
+[09-14 21:27:54] worker gpu1:前两阶段已结束,开始消费队列
+[09-14 21:27:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:27:54] worker gpu0:前两阶段已结束,开始消费队列
+[09-14 21:27:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:29:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:29:54] HOLD diam angle R_donor(表征未就绪,放回队列)
+[09-14 21:31:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:31:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:33:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:33:54] HOLD diam angle R_donor(表征未就绪,放回队列)
+[09-14 21:35:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:35:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:37:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:37:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:39:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:39:54] HOLD diam angle R_donor(表征未就绪,放回队列)
+[09-14 21:41:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:41:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:43:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:43:54] HOLD diam angle R_donor(表征未就绪,放回队列)
+[09-14 21:45:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:45:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:47:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:47:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:49:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:49:54] HOLD diam angle R_donor(表征未就绪,放回队列)
+[09-14 21:51:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:51:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:53:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:53:54] HOLD diam angle R_donor(表征未就绪,放回队列)
+[09-14 21:55:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:55:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:57:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:57:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:59:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 21:59:54] HOLD diam angle R_donor(表征未就绪,放回队列)
+[09-14 22:01:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:01:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:03:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:03:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:05:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:05:54] HOLD diam angle R_donor(表征未就绪,放回队列)
+[09-14 22:07:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:07:54] HOLD diam angle R_donor(表征未就绪,放回队列)
+[09-14 22:09:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:09:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:11:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:11:54] HOLD diam angle R_donor(表征未就绪,放回队列)
+[09-14 22:13:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:13:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:15:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:15:54] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:17:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:17:55] HOLD diam angle R_donor(表征未就绪,放回队列)
+[09-14 22:19:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:19:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:21:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:21:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:23:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:23:55] HOLD diam angle R_donor(表征未就绪,放回队列)
+[09-14 22:25:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:25:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:27:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:27:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:29:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:29:55] HOLD diam angle R_donor(表征未就绪,放回队列)
+[09-14 22:31:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:31:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:33:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:33:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:35:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:35:55] HOLD diam angle R_donor(表征未就绪,放回队列)
+[09-14 22:37:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:37:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:39:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:39:55] HOLD diam cam R_donor(表征未就绪,放回队列)
+[09-14 22:40:43] === 队列 worker 启动(两卡) ===
+[09-14 22:40:43] worker gpu0:前两阶段已结束,开始消费队列
+[09-14 22:40:43] worker gpu1:前两阶段已结束,开始消费队列
+[09-14 22:40:43] START ppo R_donor_g4_diam_cam gpu0
+[09-14 22:40:43] START ppo R_donor_g4_diam_angle gpu1
+[09-15 01:24:47] END   ppo R_donor_g4_diam_cam rc=0
+[RESULT] arm=R_donor_g4_diam_cam  v1成功率 0.0% 首次成功步 nan  回报 mean=101.0  std=39.6  满分=375  区内=0.002  末100步: xe=25.3px de=0.899m 区内=0.000 |a|=0.053
+[09-15 01:28:33] END   ppo R_donor_g4_diam_angle rc=0
+[RESULT] arm=R_donor_g4_diam_angle  v1成功率 93.8% 首次成功步 124  回报 mean=244.9  std=94.5  满分=375  区内=0.682  末100步: xe=2.1px de=0.320m 区内=0.913 |a|=0.105
+[09-15 01:41:03] END   eval R_donor_g4_diam_cam
+[09-15 01:41:03] START ppo R_donor_g4_ang_cam gpu0
+[09-15 01:45:33] END   eval R_donor_g4_diam_angle
+[09-15 01:45:33] START ppo R_donor_g4_ang_angle gpu1
+[09-15 04:24:00] END   ppo R_donor_g4_ang_cam rc=0
+[RESULT] arm=R_donor_g4_ang_cam  v1成功率 71.9% 首次成功步 137  回报 mean=150.6  std=77.5  满分=375  区内=0.498  末100步: xe=22.3px de=0.772m 区内=0.710 |a|=0.096
+[09-15 04:30:05] END   ppo R_donor_g4_ang_angle rc=0
+[RESULT] arm=R_donor_g4_ang_angle  v1成功率 98.4% 首次成功步 132  回报 mean=249.1  std=61.3  满分=375  区内=0.674  末100步: xe=1.4px de=0.110m 区内=0.952 |a|=0.056
+[09-15 04:37:56] END   eval R_donor_g4_ang_cam
+[09-15 04:37:56] START ppo sup_donor_g4_diam_cam gpu0
+[09-15 04:46:24] END   eval R_donor_g4_ang_angle
+[09-15 04:46:24] START ppo sup_donor_g4_diam_angle gpu1
+[09-15 07:20:51] END   ppo sup_donor_g4_diam_cam rc=0
+[RESULT] arm=sup_donor_g4_diam_cam  v1成功率 78.1% 首次成功步 186  回报 mean=205.3  std=35.4  满分=375  区内=0.428  末100步: xe=3.9px de=0.135m 区内=0.764 |a|=0.039
+[09-15 07:30:47] END   ppo sup_donor_g4_diam_angle rc=0
+[09-15 07:32:25] END   eval sup_donor_g4_diam_cam
+[09-15 07:32:25] START ppo sup_donor_g4_ang_cam gpu0
+[RESULT] arm=sup_donor_g4_diam_angle  v1成功率 42.2% 首次成功步 79  回报 mean=119.4  std=127.7  满分=375  区内=0.341  末100步: xe=21.5px de=3.375m 区内=0.413 |a|=0.453
+[09-15 07:44:53] END   eval sup_donor_g4_diam_angle
+[09-15 07:44:53] START ppo sup_donor_g4_ang_angle gpu1
+[09-15 10:14:36] END   ppo sup_donor_g4_ang_cam rc=0
+[RESULT] arm=sup_donor_g4_ang_cam  v1成功率 0.0% 首次成功步 nan  回报 mean=40.1  std=50.5  满分=375  区内=0.000  末100步: xe=77.5px de=4.116m 区内=0.000 |a|=0.324
+[09-15 10:26:31] END   eval sup_donor_g4_ang_cam
+[09-15 10:26:31] START ppo A_donor_g4_diam_cam gpu0
+[09-15 10:28:35] END   ppo sup_donor_g4_ang_angle rc=0
+[RESULT] arm=sup_donor_g4_ang_angle  v1成功率 34.4% 首次成功步 143  回报 mean=98.9  std=116.7  满分=375  区内=0.236  末100步: xe=18.5px de=4.160m 区内=0.337 |a|=0.277
+[09-15 10:40:33] END   eval sup_donor_g4_ang_angle
+[09-15 10:40:33] START ppo A_donor_g4_diam_angle gpu1
+[09-15 13:07:59] END   ppo A_donor_g4_diam_cam rc=0
+[RESULT] arm=A_donor_g4_diam_cam  v1成功率 23.4% 首次成功步 144  回报 mean=82.7  std=75.3  满分=375  区内=0.157  末100步: xe=41.7px de=1.575m 区内=0.233 |a|=0.455
+[09-15 13:19:55] END   eval A_donor_g4_diam_cam
+[09-15 13:19:55] START ppo A_donor_g4_ang_cam gpu0
+[09-15 13:24:51] END   ppo A_donor_g4_diam_angle rc=0
+[RESULT] arm=A_donor_g4_diam_angle  v1成功率 95.3% 首次成功步 111  回报 mean=235.9  std=61.9  满分=375  区内=0.733  末100步: xe=3.0px de=0.429m 区内=0.934 |a|=0.060
+[09-15 13:36:44] END   eval A_donor_g4_diam_angle
+[09-15 13:36:44] START ppo A_donor_g4_ang_angle gpu1
+[09-15 16:04:08] END   ppo A_donor_g4_ang_cam rc=0
+[RESULT] arm=A_donor_g4_ang_cam  v1成功率 84.4% 首次成功步 148  回报 mean=224.3  std=106.4  满分=375  区内=0.602  末100步: xe=17.0px de=0.972m 区内=0.824 |a|=0.172
+[09-15 16:16:03] END   eval A_donor_g4_ang_cam
+[09-15 16:16:03] worker gpu0 退出
+[09-15 16:23:13] END   ppo A_donor_g4_ang_angle rc=0
+[RESULT] arm=A_donor_g4_ang_angle  v1成功率 98.4% 首次成功步 121  回报 mean=184.7  std=36.3  满分=375  区内=0.697  末100步: xe=3.9px de=0.174m 区内=0.965 |a|=0.061
+[09-15 16:35:14] END   eval A_donor_g4_ang_angle
+[09-15 16:35:14] worker gpu1 退出
+[09-15 16:35:14] worker gpu 退出
+[09-15 16:35:51] 旧 worker 已退出,用新代码重启(支持 bc:)
+[09-15 16:35:51] === 队列 worker 启动(两卡) ===
+[09-15 16:35:51] worker gpu0:前两阶段已结束,开始消费队列
+[09-15 16:35:51] worker gpu1:前两阶段已结束,开始消费队列
+[09-15 16:35:51] START bc-eval A_g4_diam_cam gpu1(不训练,直接拿 stage1 的头当策略)
+[09-15 16:35:51] START bc-eval A_g4_diam_angle gpu0(不训练,直接拿 stage1 的头当策略)
+[BC] arm=A_g4_diam_cam  v1成功率 100.0% 首次成功步 108  回报 mean=292.1  std=39.4  满分=375  区内=0.775  末100步: xe=1.1px de=0.075m 区内=0.980 |a|=0.053
+[09-15 16:37:51] END   bc-eval A_g4_diam_cam rc=0
+[09-15 16:37:51] START bc-eval A_g4_ang_cam gpu1(不训练,直接拿 stage1 的头当策略)
+[BC] arm=A_g4_diam_angle  v1成功率 100.0% 首次成功步 111  回报 mean=283.0  std=52.3  满分=375  区内=0.764  末100步: xe=0.4px de=0.091m 区内=0.980 |a|=0.056
+[09-15 16:39:21] END   bc-eval A_g4_diam_angle rc=0
+[09-15 16:39:21] START bc-eval A_g4_ang_angle gpu0(不训练,直接拿 stage1 的头当策略)
+[BC] arm=A_g4_ang_cam  v1成功率 100.0% 首次成功步 99  回报 mean=293.0  std=34.0  满分=375  区内=0.794  末100步: xe=1.3px de=0.078m 区内=0.980 |a|=0.055
+[09-15 16:40:51] END   bc-eval A_g4_ang_cam rc=0
+[09-15 16:40:51] START ppo init_g4_diam_cam gpu1
+[BC] arm=A_g4_ang_angle  v1成功率 100.0% 首次成功步 97  回报 mean=306.3  std=34.5  满分=375  区内=0.798  末100步: xe=0.4px de=0.070m 区内=0.980 |a|=0.054
+[09-15 16:42:23] END   bc-eval A_g4_ang_angle rc=0
+[09-15 16:42:23] START ppo init_g4_diam_angle gpu0
+[09-15 16:46:16] head fit diam_cam/R rc=0
+[09-15 16:48:21] END   ppo init_g4_diam_angle rc=143
+[09-15 16:48:21] END   ppo init_g4_diam_cam rc=143
+[09-15 16:48:21] FAIL ppo init_g4_diam_angle
+[09-15 16:48:21] FAIL ppo init_g4_diam_cam
+[09-15 16:48:21] worker gpu0 退出
+[09-15 16:48:21] worker gpu1 退出
+[09-15 16:49:14] === 队列 worker 启动(两卡) ===
+[09-15 16:49:14] worker gpu1:前两阶段已结束,开始消费队列
+[09-15 16:49:14] worker gpu0:前两阶段已结束,开始消费队列
+[09-15 16:49:14] START ppo init_g4_diam_cam gpu0
+[09-15 16:49:14] START ppo init_g4_diam_angle gpu1
+[09-15 16:50:56] head fit diam_cam/A rc=0
+[09-15 16:55:39] head fit diam_cam/V rc=0
+[09-15 16:56:02] END   ppo init_g4_diam_cam rc=143
+[09-15 16:56:02] END   ppo init_g4_diam_angle rc=143
+[09-15 16:56:02] FAIL ppo init_g4_diam_cam
+[09-15 16:56:02] FAIL ppo init_g4_diam_angle
+[09-15 16:56:02] worker gpu0 退出
+[09-15 16:56:02] worker gpu1 退出
+[09-15 17:00:57] head fit diam_cam/sup rc=0
+[09-15 17:05:51] head fit diam_cam/init rc=0
+[09-15 17:10:04] head fit diam_angle/R rc=0
+[09-15 17:14:25] head fit diam_angle/A rc=0
+[09-15 17:19:53] head fit diam_angle/V rc=0
+[09-15 17:24:16] head fit diam_angle/sup rc=0
+[09-15 17:28:27] head fit diam_angle/init rc=0
+[09-15 17:32:35] head fit ang_cam/R rc=0
+[09-15 17:37:52] head fit ang_cam/A rc=0
+[09-15 17:42:45] head fit ang_cam/V rc=0
+[09-15 17:46:55] head fit ang_cam/sup rc=0
+[09-15 17:51:08] head fit ang_cam/init rc=0
+[09-15 17:55:25] head fit ang_angle/R rc=0
+[09-15 17:59:47] head fit ang_angle/A rc=0
+[09-15 18:04:11] head fit ang_angle/V rc=0
+[09-15 18:08:33] head fit ang_angle/sup rc=0
+[09-15 18:12:55] head fit ang_angle/init rc=0
+[09-15 18:12:55] === 20 个动作头训练完成 ===
+[09-15 19:32:10] === 队列 worker 启动(两卡) ===
+[09-15 19:32:10] worker gpu1:前两阶段已结束,开始消费队列
+[09-15 19:32:10] worker gpu0:前两阶段已结束,开始消费队列
+[09-15 19:32:10] START ppo A_donor_g4_diam_angle_blue gpu1 (任务=blue seed=1)
+[09-15 19:32:10] START ppo R_donor_g4_diam_angle_blue gpu0 (任务=blue seed=1)
+[09-15 19:40:53] END   ppo A_donor_g4_diam_angle_blue rc=143
+[09-15 19:40:53] FAIL ppo A_donor_g4_diam_angle_blue
+[09-15 19:40:53] END   ppo R_donor_g4_diam_angle_blue rc=143
+[09-15 19:40:53] worker gpu1 退出
+[09-15 19:40:53] FAIL ppo R_donor_g4_diam_angle_blue
+[09-15 19:40:53] worker gpu0 退出
+[09-15 20:19:00] === 队列 worker 启动(两卡) ===
+[09-15 20:19:00] worker gpu1:前两阶段已结束,开始消费队列
+[09-15 20:19:00] worker gpu0:前两阶段已结束,开始消费队列
+[09-15 20:19:00] START ppo A_donor_g4_diam_angle_blue gpu1 (任务=blue seed=1)
+[09-15 20:19:00] START ppo A_donor_g4_diam_angle_red gpu0 (任务=red seed=1)
+[09-15 23:01:59] END   ppo A_donor_g4_diam_angle_red rc=0
+[09-15 23:02:00] END   ppo A_donor_g4_diam_angle_blue rc=0
+[09-16 01:31:44] === 队列 worker 启动(两卡) ===
+[09-16 01:31:44] worker gpu0:前两阶段已结束,开始消费队列
+[09-16 01:31:44] worker gpu1:前两阶段已结束,开始消费队列
+[09-16 01:31:44] START ppo R_donor_g4_diam_angle_blue gpu0 (任务=blue seed=1)
+[09-16 01:31:44] START ppo R_donor_g4_diam_angle_red gpu1 (任务=red seed=1)
+[09-16 04:13:32] END   ppo R_donor_g4_diam_angle_blue rc=0
+[RESULT] arm=R_donor_g4_diam_angle_blue  v1成功率 78.1% 首次成功步 158  回报 mean=179.5  std=96.6  满分=375  区内=0.494  末100步: xe=6.0px de=1.031m 区内=0.750 |a|=0.078
+[09-16 04:17:39] END   ppo R_donor_g4_diam_angle_red rc=0
+[RESULT] arm=R_donor_g4_diam_angle_red  v1成功率 92.2% 首次成功步 188  回报 mean=202.6  std=85.2  满分=375  区内=0.498  末100步: xe=4.2px de=0.530m 区内=0.871 |a|=0.048
+[09-16 04:27:25] END   eval R_donor_g4_diam_angle_blue
+[09-16 04:27:25] START ppo sup_donor_g4_diam_angle_blue gpu0 (任务=blue seed=1)
+[09-16 04:46:26] END   eval R_donor_g4_diam_angle_red
+[09-16 04:46:26] START ppo sup_donor_g4_diam_angle_red gpu1 (任务=red seed=1)
+[09-16 04:48:06] END   ppo sup_donor_g4_diam_angle_red rc=0
+[09-16 04:48:06] FAIL ppo sup_donor_g4_diam_angle_red
+[09-16 04:48:06] START ppo init_g4_diam_angle_blue gpu1 (任务=blue seed=1)
+[09-16 04:49:46] END   ppo init_g4_diam_angle_blue rc=0
+[09-16 04:49:46] FAIL ppo init_g4_diam_angle_blue
+[09-16 04:49:47] START ppo init_g4_diam_angle_red gpu1 (任务=red seed=1)
+[09-16 04:51:27] END   ppo init_g4_diam_angle_red rc=0
+[09-16 04:51:27] FAIL ppo init_g4_diam_angle_red
+[09-16 04:51:27] START ppo A_donor_s2_g4_diam_angle_blue gpu1 (任务=blue seed=2)
+[09-16 04:53:07] END   ppo A_donor_s2_g4_diam_angle_blue rc=0
+[09-16 04:53:07] FAIL ppo A_donor_s2_g4_diam_angle_blue
+[09-16 04:53:07] START ppo A_donor_s2_g4_diam_angle_red gpu1 (任务=red seed=2)
+[09-16 04:54:47] END   ppo A_donor_s2_g4_diam_angle_red rc=0
+[09-16 04:54:47] FAIL ppo A_donor_s2_g4_diam_angle_red
+[09-16 04:54:47] START ppo R_donor_s2_g4_diam_angle_blue gpu1 (任务=blue seed=2)
+[09-16 04:56:27] END   ppo R_donor_s2_g4_diam_angle_blue rc=0
+[09-16 04:56:27] FAIL ppo R_donor_s2_g4_diam_angle_blue
+[09-16 04:56:27] START ppo R_donor_s2_g4_diam_angle_red gpu1 (任务=red seed=2)
+[09-16 04:58:08] END   ppo R_donor_s2_g4_diam_angle_red rc=0
+[09-16 04:58:08] FAIL ppo R_donor_s2_g4_diam_angle_red
+[09-16 04:58:08] START ppo sup_donor_s2_g4_diam_angle_blue gpu1 (任务=blue seed=2)
+[09-16 04:59:48] END   ppo sup_donor_s2_g4_diam_angle_blue rc=0
+[09-16 04:59:48] FAIL ppo sup_donor_s2_g4_diam_angle_blue
+[09-16 04:59:48] START ppo sup_donor_s2_g4_diam_angle_red gpu1 (任务=red seed=2)
+[09-16 05:01:28] END   ppo sup_donor_s2_g4_diam_angle_red rc=0
+[09-16 05:01:28] FAIL ppo sup_donor_s2_g4_diam_angle_red
+[09-16 05:01:28] START ppo init_s2_g4_diam_angle_blue gpu1 (任务=blue seed=2)
+[09-16 05:03:09] END   ppo init_s2_g4_diam_angle_blue rc=0
+[09-16 05:03:09] FAIL ppo init_s2_g4_diam_angle_blue
+[09-16 05:03:09] START ppo init_s2_g4_diam_angle_red gpu1 (任务=red seed=2)
+[09-16 05:04:49] END   ppo init_s2_g4_diam_angle_red rc=0
+[09-16 05:04:49] FAIL ppo init_s2_g4_diam_angle_red
+[09-16 05:04:49] START ppo A_donor_s3_g4_diam_angle_blue gpu1 (任务=blue seed=3)
+[09-16 05:06:29] END   ppo A_donor_s3_g4_diam_angle_blue rc=0
+[09-16 05:06:29] FAIL ppo A_donor_s3_g4_diam_angle_blue
+[09-16 05:06:29] START ppo A_donor_s3_g4_diam_angle_red gpu1 (任务=red seed=3)
+[09-16 05:08:10] END   ppo A_donor_s3_g4_diam_angle_red rc=0
+[09-16 05:08:10] FAIL ppo A_donor_s3_g4_diam_angle_red
+[09-16 05:08:10] START ppo R_donor_s3_g4_diam_angle_blue gpu1 (任务=blue seed=3)
+[09-16 05:09:50] END   ppo R_donor_s3_g4_diam_angle_blue rc=0
+[09-16 05:09:50] FAIL ppo R_donor_s3_g4_diam_angle_blue
+[09-16 05:09:50] START ppo R_donor_s3_g4_diam_angle_red gpu1 (任务=red seed=3)
+[09-16 05:11:30] END   ppo R_donor_s3_g4_diam_angle_red rc=0
+[09-16 05:11:30] FAIL ppo R_donor_s3_g4_diam_angle_red
+[09-16 05:11:30] START ppo sup_donor_s3_g4_diam_angle_blue gpu1 (任务=blue seed=3)
+[09-16 05:13:11] END   ppo sup_donor_s3_g4_diam_angle_blue rc=0
+[09-16 05:13:11] FAIL ppo sup_donor_s3_g4_diam_angle_blue
+[09-16 05:13:11] worker gpu1 退出
+[09-16 05:17:56] END   ppo sup_donor_g4_diam_angle_blue rc=137
+[09-16 05:17:56] FAIL ppo sup_donor_g4_diam_angle_blue
+[09-16 05:17:56] START ppo sup_donor_g4_diam_angle_red gpu0 (任务=red seed=1)
+[09-16 05:18:05] === 队列 worker 启动(两卡) ===
+[09-16 05:18:05] worker gpu0:前两阶段已结束,开始消费队列
+[09-16 05:18:05] worker gpu1:前两阶段已结束,开始消费队列
+[09-16 05:18:05] START ppo sup_donor_g4_diam_angle_blue gpu0 (任务=blue seed=1)
+[09-16 05:18:05] START ppo init_g4_diam_angle_blue gpu1 (任务=blue seed=1)
+[09-16 07:59:39] END   ppo sup_donor_g4_diam_angle_blue rc=0
+[RESULT] arm=sup_donor_g4_diam_angle_blue  v1成功率 12.5% 首次成功步 195  回报 mean=60.6  std=63.1  满分=375  区内=0.073  末100步: xe=21.1px de=3.038m 区内=0.125 |a|=0.085
+[09-16 08:04:12] END   ppo init_g4_diam_angle_blue rc=0
+[RESULT] arm=init_g4_diam_angle_blue  v1成功率 71.9% 首次成功步 189  回报 mean=148.2  std=91.8  满分=375  区内=0.384  末100步: xe=6.0px de=1.055m 区内=0.635 |a|=0.143
+[09-16 08:14:35] END   eval sup_donor_g4_diam_angle_blue
+[09-16 08:14:35] START ppo init_g4_diam_angle_red gpu0 (任务=red seed=1)
+[09-16 08:21:05] END   eval init_g4_diam_angle_blue
+[09-16 08:21:05] START ppo A_donor_s2_g4_diam_angle_blue gpu1 (任务=blue seed=2)
+[09-16 10:56:43] END   ppo init_g4_diam_angle_red rc=0
+[RESULT] arm=init_g4_diam_angle_red  v1成功率 76.6% 首次成功步 151  回报 mean=174.0  std=104.5  满分=375  区内=0.480  末100步: xe=10.0px de=1.598m 区内=0.749 |a|=0.101
+[09-16 11:03:46] END   ppo A_donor_s2_g4_diam_angle_blue rc=0
+[RESULT] arm=A_donor_s2_g4_diam_angle_blue  v1成功率 0.0% 首次成功步 nan  回报 mean=39.3  std=35.7  满分=375  区内=0.003  末100步: xe=27.6px de=3.998m 区内=0.006 |a|=0.090
+[09-16 11:10:39] END   eval init_g4_diam_angle_red
+[09-16 11:10:39] START ppo sup_donor_g4_diam_angle_red gpu0 (任务=red seed=1)
+[09-16 11:19:07] END   eval A_donor_s2_g4_diam_angle_blue
+[09-16 11:19:07] START ppo A_donor_s2_g4_diam_angle_red gpu1 (任务=red seed=2)
+[09-16 12:51:55] END   ppo A_donor_s2_g4_diam_angle_red rc=143
+[09-16 12:51:55] FAIL ppo A_donor_s2_g4_diam_angle_red
+[09-16 12:51:55] 任务失败,休息 60s
+[09-16 12:52:55] START ppo V_donor_g4_diam_angle_blue gpu1 (任务=blue seed=1)
+[09-16 13:53:42] END   ppo sup_donor_g4_diam_angle_red rc=0
+[RESULT] arm=sup_donor_g4_diam_angle_red  v1成功率 26.6% 首次成功步 113  回报 mean=78.4  std=107.8  满分=375  区内=0.214  末100步: xe=17.2px de=4.175m 区内=0.260 |a|=0.723
+[09-16 14:05:16] END   eval sup_donor_g4_diam_angle_red
+[09-16 14:05:16] START ppo V_donor_g4_diam_angle_red gpu0 (任务=red seed=1)
+[09-16 15:37:20] END   ppo V_donor_g4_diam_angle_blue rc=0
+[09-16 15:37:58] DECODE 窗口出现在 gpu1(已用 18MB),开始
+[RESULT] arm=V_donor_g4_diam_angle_blue  v1成功率 78.1% 首次成功步 147  回报 mean=186.3  std=88.1  满分=375  区内=0.521  末100步: xe=6.2px de=0.864m 区内=0.766 |a|=0.098
+[09-16 15:42:39] REAP gpu1 残留进程 3727122
+[09-16 15:42:39] DECODE rc=137 -> 
+[09-16 15:50:43] END   eval V_donor_g4_diam_angle_blue
+[09-16 15:50:43] START ppo A_donor_s2_g4_diam_angle_red gpu1 (任务=red seed=2)
+[09-16 16:47:50] END   ppo V_donor_g4_diam_angle_red rc=0
+[RESULT] arm=V_donor_g4_diam_angle_red  v1成功率 62.5% 首次成功步 150  回报 mean=143.0  std=100.5  满分=375  区内=0.432  末100步: xe=6.8px de=2.569m 区内=0.612 |a|=0.102
+[09-16 16:59:44] END   eval V_donor_g4_diam_angle_red
+[09-16 16:59:44] START ppo R_donor_s2_g4_diam_angle_blue gpu0 (任务=blue seed=2)
+[09-16 18:43:35] END   ppo A_donor_s2_g4_diam_angle_red rc=0
+[RESULT] arm=A_donor_s2_g4_diam_angle_red  v1成功率 71.9% 首次成功步 136  回报 mean=206.8  std=68.4  满分=375  区内=0.516  末100步: xe=5.8px de=0.425m 区内=0.694 |a|=0.057
+[09-16 18:55:50] END   eval A_donor_s2_g4_diam_angle_red
+[09-16 18:55:50] START ppo R_donor_s2_g4_diam_angle_red gpu1 (任务=red seed=2)
+[09-16 19:50:21] END   ppo R_donor_s2_g4_diam_angle_blue rc=0
+[RESULT] arm=R_donor_s2_g4_diam_angle_blue  v1成功率 73.4% 首次成功步 160  回报 mean=168.5  std=73.0  满分=375  区内=0.469  末100步: xe=5.6px de=0.654m 区内=0.718 |a|=0.066
+[09-16 20:02:15] END   eval R_donor_s2_g4_diam_angle_blue
+[09-16 20:02:15] START ppo sup_donor_s2_g4_diam_angle_blue gpu0 (任务=blue seed=2)
+[09-16 20:05:38] 队列补 V 臂 seed2/3 四条(V 之前只排了 seed1,而 V 恰好是蓝>红的异常臂,必须有种子才能定)
+[09-16 21:11:52] 预占 seed3 的 10 条(占位不跑),让 worker 先把 seed2 补齐(含 V 臂);seed2 完成后 after_queue.sh 会接身份实验渲染。想放开 seed3 就 rmdir 那些 claim 目录。
+[09-16 21:40:50] END   ppo R_donor_s2_g4_diam_angle_red rc=0
+[RESULT] arm=R_donor_s2_g4_diam_angle_red  v1成功率 81.2% 首次成功步 164  回报 mean=198.6  std=104.6  满分=375  区内=0.510  末100步: xe=4.5px de=0.570m 区内=0.772 |a|=0.114
+[09-16 21:52:45] END   eval R_donor_s2_g4_diam_angle_red
+[09-16 21:52:45] START ppo sup_donor_s2_g4_diam_angle_red gpu1 (任务=red seed=2)
+[09-16 22:43:36] END   ppo sup_donor_s2_g4_diam_angle_blue rc=0
+[RESULT] arm=sup_donor_s2_g4_diam_angle_blue  v1成功率 32.8% 首次成功步 214  回报 mean=88.4  std=93.5  满分=375  区内=0.167  末100步: xe=18.6px de=2.832m 区内=0.296 |a|=0.171
+[09-16 22:55:30] END   eval sup_donor_s2_g4_diam_angle_blue
+[09-16 22:55:30] START ppo init_s2_g4_diam_angle_blue gpu0 (任务=blue seed=2)
+[09-17 00:37:17] END   ppo sup_donor_s2_g4_diam_angle_red rc=0
+[RESULT] arm=sup_donor_s2_g4_diam_angle_red  v1成功率 0.0% 首次成功步 nan  回报 mean=57.4  std=57.8  满分=375  区内=0.000  末100步: xe=20.2px de=5.999m 区内=0.000 |a|=0.548
+[09-17 00:49:13] END   eval sup_donor_s2_g4_diam_angle_red
+[09-17 00:49:13] START ppo init_s2_g4_diam_angle_red gpu1 (任务=red seed=2)
+[09-17 01:37:41] END   ppo init_s2_g4_diam_angle_blue rc=0
+[RESULT] arm=init_s2_g4_diam_angle_blue  v1成功率 10.9% 首次成功步 102  回报 mean=114.0  std=68.3  满分=375  区内=0.202  末100步: xe=12.6px de=1.395m 区内=0.281 |a|=0.228
+[09-17 01:49:38] END   eval init_s2_g4_diam_angle_blue
+[09-17 01:49:38] START ppo V_donor_s2_g4_diam_angle_red gpu0 (任务=red seed=2)
+[09-17 03:33:44] END   ppo init_s2_g4_diam_angle_red rc=0
+[RESULT] arm=init_s2_g4_diam_angle_red  v1成功率 64.1% 首次成功步 154  回报 mean=144.1  std=102.1  满分=375  区内=0.434  末100步: xe=13.8px de=1.916m 区内=0.628 |a|=0.065
+[09-17 03:45:38] END   eval init_s2_g4_diam_angle_red
+[09-17 03:45:38] START ppo V_donor_s2_g4_diam_angle_blue gpu1 (任务=blue seed=2)
+[09-17 04:31:50] END   ppo V_donor_s2_g4_diam_angle_red rc=0
+[RESULT] arm=V_donor_s2_g4_diam_angle_red  v1成功率 92.2% 首次成功步 182  回报 mean=178.8  std=61.6  满分=375  区内=0.525  末100步: xe=5.4px de=0.347m 区内=0.894 |a|=0.131
+[09-17 04:43:42] END   eval V_donor_s2_g4_diam_angle_red
+[09-17 05:11:52] 队列全部认领完,gpu0 已空闲;停掉 after_queue 链改为手动编排:现在就用 gpu0 渲身份实验(不等 gpu1 的 V_蓝_2),省 75 分钟。写了 g4_stop,worker 当前任务跑完自退。
+[09-17 05:11:52] START 身份实验渲染 gpu0(14 条件 × 6 轮 × 64 env)
+[09-17 05:12:23] END   身份实验渲染 rc=0 帧数=5376
+[09-17 05:12:44] worker gpu0 退出
+[09-17 05:18:13] END   身份实验分析 -> identity_out.txt
+[09-17 06:30:22] END   ppo V_donor_s2_g4_diam_angle_blue rc=0
+[RESULT] arm=V_donor_s2_g4_diam_angle_blue  v1成功率 71.9% 首次成功步 211  回报 mean=151.7  std=83.5  满分=375  区内=0.382  末100步: xe=5.7px de=0.951m 区内=0.662 |a|=0.119
+[09-17 06:42:22] END   eval V_donor_s2_g4_diam_angle_blue
+[09-17 06:42:22] worker gpu1 退出
+[09-17 07:12:06] 身份实验已完成,两卡空闲;释放 seed3 的 10 条并重启 worker(主结论目前只有 n=2,A/R 那一格值得 n=3;V 两个种子差 31 点也需要第三个)
+[09-17 07:12:07] === 队列 worker 启动(两卡) ===
+[09-17 07:12:07] worker gpu1:前两阶段已结束,开始消费队列
+[09-17 07:12:07] worker gpu0:前两阶段已结束,开始消费队列
+[09-17 07:12:07] START ppo A_donor_s3_g4_diam_angle_blue gpu1 (任务=blue seed=3)
+[09-17 07:12:07] START ppo A_donor_s3_g4_diam_angle_red gpu0 (任务=red seed=3)
+[09-17 09:55:14] END   ppo A_donor_s3_g4_diam_angle_blue rc=0
+[09-17 09:55:23] END   ppo A_donor_s3_g4_diam_angle_red rc=0
+[RESULT] arm=A_donor_s3_g4_diam_angle_blue  v1成功率 6.2% 首次成功步 262  回报 mean=49.9  std=47.1  满分=375  区内=0.027  末100步: xe=24.8px de=3.455m 区内=0.052 |a|=0.106
+[RESULT] arm=A_donor_s3_g4_diam_angle_red  v1成功率 73.4% 首次成功步 115  回报 mean=208.8  std=121.1  满分=375  区内=0.568  末100步: xe=10.7px de=1.212m 区内=0.712 |a|=0.119
+[09-17 10:12:14] END   eval A_donor_s3_g4_diam_angle_blue
+[09-17 10:12:14] START ppo R_donor_s3_g4_diam_angle_blue gpu1 (任务=blue seed=3)
+[09-17 10:13:44] END   eval A_donor_s3_g4_diam_angle_red
+[09-17 10:13:44] START ppo R_donor_s3_g4_diam_angle_red gpu0 (任务=red seed=3)
+[09-17 12:56:45] END   ppo R_donor_s3_g4_diam_angle_red rc=0
+[09-17 12:57:21] END   ppo R_donor_s3_g4_diam_angle_blue rc=0
+[RESULT] arm=R_donor_s3_g4_diam_angle_red  v1成功率 95.3% 首次成功步 137  回报 mean=238.0  std=71.8  满分=375  区内=0.622  末100步: xe=2.9px de=0.369m 区内=0.934 |a|=0.036
+[RESULT] arm=R_donor_s3_g4_diam_angle_blue  v1成功率 71.9% 首次成功步 165  回报 mean=150.0  std=83.2  满分=375  区内=0.428  末100步: xe=9.4px de=1.085m 区内=0.677 |a|=0.090
+[09-17 13:13:45] END   eval R_donor_s3_g4_diam_angle_red
+[09-17 13:13:45] START ppo sup_donor_s3_g4_diam_angle_blue gpu0 (任务=blue seed=3)
+[09-17 13:15:15] END   eval R_donor_s3_g4_diam_angle_blue
+[09-17 13:15:15] START ppo sup_donor_s3_g4_diam_angle_red gpu1 (任务=red seed=3)
+[09-17 15:55:34] END   ppo sup_donor_s3_g4_diam_angle_blue rc=0
+[RESULT] arm=sup_donor_s3_g4_diam_angle_blue  v1成功率 10.9% 首次成功步 182  回报 mean=58.2  std=66.6  满分=375  区内=0.066  末100步: xe=23.9px de=3.438m 区内=0.105 |a|=0.086
+[09-17 16:00:01] END   ppo sup_donor_s3_g4_diam_angle_red rc=0
+[RESULT] arm=sup_donor_s3_g4_diam_angle_red  v1成功率 0.0% 首次成功步 nan  回报 mean=70.4  std=63.0  满分=375  区内=0.000  末100步: xe=19.2px de=3.625m 区内=0.000 |a|=0.482
+[09-17 16:05:40] START 形状实验渲染 gpu0(10 条件 × 6 轮 × 64 env)
+[09-17 16:06:12] END   形状实验渲染 rc=0 帧数=5376
+[09-17 16:10:35] END   eval sup_donor_s3_g4_diam_angle_blue
+[09-17 16:10:43] END   形状实验分析 -> shape_out.txt
+[09-17 16:10:43] 放回 seed3 的 10 条,worker 继续
+[09-17 16:11:35] SKIP A_donor_g4_diam_angle(已有)
+[09-17 16:11:35] SKIP A_donor_g4_diam_angle(已有)
+[09-17 16:11:35] SKIP R_donor_g4_diam_angle(已有)
+[09-17 16:11:35] SKIP R_donor_g4_diam_angle(已有)
+[09-17 16:11:35] SKIP sup_donor_g4_diam_angle(已有)
+[09-17 16:11:35] SKIP sup_donor_g4_diam_angle(已有)
+[09-17 16:11:35] START ppo init_s3_g4_diam_angle_blue gpu0 (任务=blue seed=3)
+[09-17 16:17:04] END   eval sup_donor_s3_g4_diam_angle_red
+[09-17 16:17:04] START ppo init_s3_g4_diam_angle_red gpu1 (任务=red seed=3)
+[09-17 17:12:14] 已挂 distract_eval.sh:等 seed3 全部跑完 -> 把干扰球改成红/绿,用各臂 seed1 最佳 ckpt 重评估追红球任务(配对比较,10 次)
+[09-17 17:22:50] END   ppo init_s3_g4_diam_angle_blue rc=137
+[09-17 17:22:50] END   ppo init_s3_g4_diam_angle_red rc=137
+[09-17 17:22:50] FAIL ppo init_s3_g4_diam_angle_blue
+[09-17 17:22:50] FAIL ppo init_s3_g4_diam_angle_red
+[09-17 17:22:50] 任务失败,休息 60s
+[09-17 17:22:50] 任务失败,休息 60s
+[09-17 17:22:58] 用户要尽快看换干扰的结果:杀掉 init_s3 两条(init n=2 已很紧,红 78.1/75.0、蓝 79.7/82.8,第三个种子边际价值最低),停 worker,改为我自己编排:gpu0 跑 10 次换干扰配对评估,gpu1 跑 V 的 seed3 两条。
+[09-17 17:23:19] === gpu0:换干扰颜色的配对评估(红球任务,各臂 seed1 最佳 ckpt)===
+[09-17 17:23:19] START distract-eval A_donor ckpt=last.pt noise=red
+[09-17 17:23:39] START ppo V_donor_s3_g4_diam_angle_red gpu1
+[09-17 17:23:50] worker gpu0 退出
+[09-17 17:23:50] worker gpu1 退出
+[NOISE-COLOR] 干扰球改成 red(1.0, 0.0, 0.0),改了 64 个材质属性
+[RESULT] arm=A_donor_nzred  v1成功率 40.6% 首次成功步 174  回报 mean=99.3  std=101.6  满分=375  区内=0.247  末100步: xe=19.3px de=2.730m 区内=0.395 |a|=0.090
+[09-17 17:24:49] END   distract-eval A_donor red
+[09-17 17:24:49] START distract-eval R_donor ckpt=updates/ppo_000220.pt noise=red
+[NOISE-COLOR] 干扰球改成 red(1.0, 0.0, 0.0),改了 64 个材质属性
+[RESULT] arm=R_donor_nzred  v1成功率 46.9% 首次成功步 181  回报 mean=113.8  std=106.6  满分=375  区内=0.260  末100步: xe=18.8px de=2.825m 区内=0.459 |a|=0.045
+[09-17 17:26:47] END   distract-eval R_donor red
+[09-17 17:26:47] START distract-eval V_donor ckpt=updates/ppo_000210.pt noise=red
+[NOISE-COLOR] 干扰球改成 red(1.0, 0.0, 0.0),改了 64 个材质属性
+[RESULT] arm=V_donor_nzred  v1成功率 26.6% 首次成功步 163  回报 mean=89.6  std=95.3  满分=375  区内=0.176  末100步: xe=18.4px de=3.385m 区内=0.260 |a|=0.095
+[09-17 17:28:16] END   distract-eval V_donor red
+[09-17 17:28:16] START distract-eval init ckpt=updates/ppo_000220.pt noise=red
+[NOISE-COLOR] 干扰球改成 red(1.0, 0.0, 0.0),改了 64 个材质属性
+[RESULT] arm=init_nzred  v1成功率 46.9% 首次成功步 128  回报 mean=120.5  std=118.3  满分=375  区内=0.331  末100步: xe=19.1px de=2.938m 区内=0.455 |a|=0.052
+[09-17 17:29:45] END   distract-eval init red
+[09-17 17:29:45] START distract-eval sup_donor ckpt=updates/ppo_000220.pt noise=red
+[NOISE-COLOR] 干扰球改成 red(1.0, 0.0, 0.0),改了 64 个材质属性
+[RESULT] arm=sup_donor_nzred  v1成功率 25.0% 首次成功步 154  回报 mean=75.1  std=97.5  满分=375  区内=0.161  末100步: xe=23.9px de=3.776m 区内=0.230 |a|=0.268
+[09-17 17:31:14] END   distract-eval sup_donor red
+[09-17 17:31:14] START distract-eval A_donor ckpt=last.pt noise=green
+[NOISE-COLOR] 干扰球改成 green(0.0, 0.72, 0.1),改了 64 个材质属性
+[RESULT] arm=A_donor_nzgreen  v1成功率 56.2% 首次成功步 168  回报 mean=125.4  std=114.1  满分=375  区内=0.347  末100步: xe=17.6px de=2.558m 区内=0.547 |a|=0.322
+[09-17 17:32:43] END   distract-eval A_donor green
+[09-17 17:32:43] START distract-eval R_donor ckpt=updates/ppo_000220.pt noise=green
+[NOISE-COLOR] 干扰球改成 green(0.0, 0.72, 0.1),改了 64 个材质属性
+[RESULT] arm=R_donor_nzgreen  v1成功率 93.8% 首次成功步 159  回报 mean=214.1  std=79.0  满分=375  区内=0.572  末100步: xe=3.7px de=0.440m 区内=0.903 |a|=0.041
+[09-17 17:34:12] END   distract-eval R_donor green
+[09-17 17:34:12] START distract-eval V_donor ckpt=updates/ppo_000210.pt noise=green
+[NOISE-COLOR] 干扰球改成 green(0.0, 0.72, 0.1),改了 64 个材质属性
+[RESULT] arm=V_donor_nzgreen  v1成功率 65.6% 首次成功步 149  回报 mean=155.7  std=105.1  满分=375  区内=0.453  末100步: xe=4.7px de=2.394m 区内=0.639 |a|=0.115
+[09-17 17:35:41] END   distract-eval V_donor green
+[09-17 17:35:41] START distract-eval init ckpt=updates/ppo_000220.pt noise=green
+[NOISE-COLOR] 干扰球改成 green(0.0, 0.72, 0.1),改了 64 个材质属性
+[RESULT] arm=init_nzgreen  v1成功率 56.2% 首次成功步 136  回报 mean=139.0  std=116.2  满分=375  区内=0.383  末100步: xe=15.4px de=2.362m 区内=0.545 |a|=0.068
+[09-17 17:37:10] END   distract-eval init green
+[09-17 17:37:10] START distract-eval sup_donor ckpt=updates/ppo_000220.pt noise=green
+[NOISE-COLOR] 干扰球改成 green(0.0, 0.72, 0.1),改了 64 个材质属性
+[RESULT] arm=sup_donor_nzgreen  v1成功率 39.1% 首次成功步 139  回报 mean=100.7  std=111.6  满分=375  区内=0.273  末100步: xe=19.7px de=4.641m 区内=0.383 |a|=0.553
+[09-17 17:38:39] END   distract-eval sup_donor green
+[09-17 17:38:39] === gpu0:换干扰评估全部完成 ===
+[09-17 17:53:23] START 干扰属性扫描渲染 gpu0(15 条件 × 6 轮 × 64)
+[09-17 17:53:56] END   干扰属性扫描渲染 rc=0 帧数=5760
+[09-17 19:12:31] === gpu0:换干扰评估补 seed2/3(A、R × 红绿)===
+[09-17 19:12:31] START dz A_donor_s2 ckpt=updates/ppo_000230.pt noise=green
+[RESULT] arm=A_donor_s2_nzgreen  v1成功率 90.6% 首次成功步 118  回报 mean=230.3  std=80.2  满分=375  区内=0.689  末100步: xe=4.6px de=0.709m 区内=0.888 |a|=0.065
+[09-17 19:13:50] END   dz A_donor_s2 green
+[09-17 19:13:50] START dz A_donor_s3 ckpt=updates/ppo_000200.pt noise=green
+[RESULT] arm=A_donor_s3_nzgreen  v1成功率 85.9% 首次成功步 120  回报 mean=226.0  std=92.4  满分=375  区内=0.642  末100步: xe=5.6px de=0.654m 区内=0.842 |a|=0.097
+[09-17 19:15:09] END   dz A_donor_s3 green
+[09-17 19:15:09] START dz R_donor_s2 ckpt=updates/ppo_000210.pt noise=green
+[RESULT] arm=R_donor_s2_nzgreen  v1成功率 93.8% 首次成功步 151  回报 mean=210.8  std=73.8  满分=375  区内=0.634  末100步: xe=3.7px de=0.512m 区内=0.918 |a|=0.059
+[09-17 19:16:23] END   dz R_donor_s2 green
+[09-17 19:16:23] START dz R_donor_s3 ckpt=updates/ppo_000230.pt noise=green
+[RESULT] arm=R_donor_s3_nzgreen  v1成功率 89.1% 首次成功步 122  回报 mean=197.7  std=70.4  满分=375  区内=0.618  末100步: xe=6.1px de=0.547m 区内=0.873 |a|=0.051
+[09-17 19:17:36] END   dz R_donor_s3 green
+[09-17 19:17:36] START dz A_donor_s2 ckpt=updates/ppo_000230.pt noise=red
+[RESULT] arm=A_donor_s2_nzred  v1成功率 35.9% 首次成功步 112  回报 mean=110.7  std=116.7  满分=375  区内=0.279  末100步: xe=20.7px de=3.047m 区内=0.352 |a|=0.053
+[09-17 19:18:49] END   dz A_donor_s2 red
+[09-17 19:18:49] START dz A_donor_s3 ckpt=updates/ppo_000200.pt noise=red
+[RESULT] arm=A_donor_s3_nzred  v1成功率 39.1% 首次成功步 105  回报 mean=129.1  std=127.7  满分=375  区内=0.309  末100步: xe=18.6px de=2.899m 区内=0.383 |a|=0.079
+[09-17 19:20:04] END   dz A_donor_s3 red
+[09-17 19:20:04] START dz R_donor_s2 ckpt=updates/ppo_000210.pt noise=red
+[09-17 19:35:49] END   dz R_donor_s2 red
+[09-17 19:35:49] START dz R_donor_s3 ckpt=updates/ppo_000230.pt noise=red
+[RESULT] arm=R_donor_s3_nzred  v1成功率 28.1% 首次成功步 143  回报 mean=84.7  std=90.8  满分=375  区内=0.182  末100步: xe=21.1px de=2.945m 区内=0.264 |a|=0.085
+[09-17 19:37:03] END   dz R_donor_s3 red
+[09-17 19:37:03] === gpu0:补种子完成 ===
+[09-17 20:07:44] END   ppo V_donor_s3_g4_diam_angle_red rc=0
+[RESULT] arm=V_donor_s3_g4_diam_angle_red  v1成功率 64.1% 首次成功步 164  回报 mean=142.9  std=99.8  满分=375  区内=0.405  末100步: xe=6.4px de=1.534m 区内=0.603 |a|=0.120
+[09-17 20:16:32] END   eval V_donor_s3_g4_diam_angle_red
+[09-17 20:16:32] START ppo V_donor_s3_g4_diam_angle_blue gpu1
+[09-17 22:53:06] END   ppo V_donor_s3_g4_diam_angle_blue rc=0
+[RESULT] arm=V_donor_s3_g4_diam_angle_blue  v1成功率 79.7% 首次成功步 178  回报 mean=171.3  std=88.1  满分=375  区内=0.463  末100步: xe=5.3px de=0.847m 区内=0.755 |a|=0.115
+[09-17 23:01:56] END   eval V_donor_s3_g4_diam_angle_blue
+[09-17 23:01:56] === gpu1:V 的 seed3 两条完成 ===
+[09-17 23:12:15] 清掉 gpu0 上的孤儿评估进程 152458(R_donor_s2 红干扰,timeout 只杀了外壳,内层 python 挂了 3h51m);该格数据缺失,按用户指示不再补跑
+[09-18 01:11:33] V 的 seed3 两条当时是绕过 worker 手工跑的(now_v3.sh),claim 目录没建,队列显示为未认领造成误导;现补上占位。实际两条都已完成并入库。队列至此全部结束。
+[09-18 14:50:58] 补跑 R_donor_s2 红干扰评估(唯一缺失格)
+[RESULT] arm=R_donor_s2_nzred  v1成功率 48.4% 首次成功步 166  回报 mean=122.2  std=107.4  满分=375  区内=0.307  末100步: xe=16.4px de=2.427m 区内=0.466 |a|=0.054
+[09-18 14:51:27] 补跑完成 rc=0
+[09-18 15:10:43] === 机制拆分:stage1 训 Asym / Aw / Ax(gpu0,不碰环境与 teacher)===
+[09-18 15:29:42] END stage1 rc=0 [INFO] Asym dim=2 donor_held=0.0106 transplant_held=1.3398 [INFO] Aw   dim=1 donor_held=0.0289 transplant_held=7.7254 [INFO] Ax   dim=1 donor_held=0.0076 transplant_held=1.2809 
+[09-18 15:32:11] END 机制拆分探针 -> mech_probe_out.txt
+[09-18 17:10:17] === gpu1:策略层面的形状对照(干扰物恒为红色,只换形状)===
+[09-18 17:10:17] START shape-eval A_donor ckpt=last.pt 干扰=红cube
+[RESULT] arm=A_donor_nzredcube  v1成功率 32.8% 首次成功步 180  回报 mean=82.4  std=95.7  满分=375  区内=0.194  末100步: xe=22.1px de=3.062m 区内=0.313 |a|=0.084
+[09-18 17:11:33] END   shape-eval A_donor 红cube
+[09-18 17:11:33] START shape-eval A_donor_s2 ckpt=updates/ppo_000230.pt 干扰=红cube
+[09-18 17:11:56] START ppo Ax_donor_g4_diam_angle_red gpu0
+[RESULT] arm=A_donor_s2_nzredcube  v1成功率 31.2% 首次成功步 117  回报 mean=99.2  std=112.9  满分=375  区内=0.240  末100步: xe=22.5px de=3.261m 区内=0.306 |a|=0.053
+[09-18 17:12:48] END   shape-eval A_donor_s2 红cube
+[09-18 17:12:48] START shape-eval A_donor_s3 ckpt=updates/ppo_000200.pt 干扰=红cube
+[RESULT] arm=A_donor_s3_nzredcube  v1成功率 32.8% 首次成功步 104  回报 mean=116.1  std=123.4  满分=375  区内=0.264  末100步: xe=19.7px de=3.142m 区内=0.322 |a|=0.062
+[09-18 17:14:32] END   shape-eval A_donor_s3 红cube
+[09-18 17:14:32] START shape-eval R_donor ckpt=updates/ppo_000220.pt 干扰=红cube
+[RESULT] arm=R_donor_nzredcube  v1成功率 31.2% 首次成功步 187  回报 mean=82.0  std=97.1  满分=375  区内=0.167  末100步: xe=23.1px de=3.388m 区内=0.305 |a|=0.049
+[09-18 17:15:47] END   shape-eval R_donor 红cube
+[09-18 17:15:47] START shape-eval R_donor_s2 ckpt=updates/ppo_000210.pt 干扰=红cube
+[RESULT] arm=R_donor_s2_nzredcube  v1成功率 35.9% 首次成功步 173  回报 mean=95.9  std=98.8  满分=375  区内=0.223  末100步: xe=20.5px de=2.959m 区内=0.347 |a|=0.050
+[09-18 17:17:01] END   shape-eval R_donor_s2 红cube
+[09-18 17:17:01] START shape-eval R_donor_s3 ckpt=updates/ppo_000230.pt 干扰=红cube
+[RESULT] arm=R_donor_s3_nzredcube  v1成功率 18.8% 首次成功步 147  回报 mean=72.3  std=83.5  满分=375  区内=0.120  末100步: xe=23.5px de=3.177m 区内=0.177 |a|=0.081
+[09-18 17:18:15] END   shape-eval R_donor_s3 红cube
+[09-18 17:18:15] START shape-eval A_donor ckpt=last.pt 干扰=红cone
+[RESULT] arm=A_donor_nzredcone  v1成功率 51.6% 首次成功步 183  回报 mean=122.2  std=98.0  满分=375  区内=0.303  末100步: xe=14.0px de=2.052m 区内=0.498 |a|=0.071
+[09-18 17:19:29] END   shape-eval A_donor 红cone
+[09-18 17:19:29] START shape-eval A_donor_s2 ckpt=updates/ppo_000230.pt 干扰=红cone
+[RESULT] arm=A_donor_s2_nzredcone  v1成功率 40.6% 首次成功步 114  回报 mean=126.2  std=120.1  满分=375  区内=0.317  末100步: xe=18.5px de=2.682m 区内=0.398 |a|=0.051
+[09-18 17:20:42] END   shape-eval A_donor_s2 红cone
+[09-18 17:20:42] START shape-eval A_donor_s3 ckpt=updates/ppo_000200.pt 干扰=红cone
+[RESULT] arm=A_donor_s3_nzredcone  v1成功率 43.8% 首次成功步 110  回报 mean=137.7  std=127.9  满分=375  区内=0.356  末100步: xe=17.3px de=2.700m 区内=0.444 |a|=0.080
+[09-18 17:21:56] END   shape-eval A_donor_s3 红cone
+[09-18 17:21:56] START shape-eval R_donor ckpt=updates/ppo_000220.pt 干扰=红cone
+[RESULT] arm=R_donor_nzredcone  v1成功率 50.0% 首次成功步 178  回报 mean=121.1  std=106.2  满分=375  区内=0.279  末100步: xe=17.4px de=2.606m 区内=0.490 |a|=0.047
+[09-18 17:23:10] END   shape-eval R_donor 红cone
+[09-18 17:23:10] START shape-eval R_donor_s2 ckpt=updates/ppo_000210.pt 干扰=红cone
+[RESULT] arm=R_donor_s2_nzredcone  v1成功率 53.1% 首次成功步 146  回报 mean=134.5  std=110.5  满分=375  区内=0.363  末100步: xe=14.9px de=2.237m 区内=0.514 |a|=0.056
+[09-18 17:24:24] END   shape-eval R_donor_s2 红cone
+[09-18 17:24:24] START shape-eval R_donor_s3 ckpt=updates/ppo_000230.pt 干扰=红cone
+[RESULT] arm=R_donor_s3_nzredcone  v1成功率 39.1% 首次成功步 121  回报 mean=113.1  std=98.1  满分=375  区内=0.279  末100步: xe=17.7px de=2.315m 区内=0.389 |a|=0.082
+[09-18 17:25:39] END   shape-eval R_donor_s3 红cone
+[09-18 17:25:39] === gpu1:形状对照完成 ===
+[09-18 17:25:56] START ppo Aw_donor_g4_diam_angle_red gpu1
+[09-18 19:55:38] END   ppo Ax_donor_g4_diam_angle_red rc=0
+[RESULT] arm=Ax_donor_g4_diam_angle_red  v1成功率 84.4% 首次成功步 173  回报 mean=186.1  std=97.1  满分=375  区内=0.507  末100步: xe=6.5px de=0.842m 区内=0.808 |a|=0.067
+[09-18 20:04:31] END   eval Ax_donor_g4_diam_angle_red
+[09-18 20:04:31] START ppo Ax_donor_g4_diam_angle_blue gpu0
+[09-18 20:11:50] END   ppo Aw_donor_g4_diam_angle_red rc=0
+[RESULT] arm=Aw_donor_g4_diam_angle_red  v1成功率 43.8% 首次成功步 157  回报 mean=108.0  std=112.4  满分=375  区内=0.300  末100步: xe=21.4px de=4.597m 区内=0.429 |a|=0.490
+[09-18 20:20:47] END   eval Aw_donor_g4_diam_angle_red
+[09-18 20:20:47] START ppo Aw_donor_g4_diam_angle_blue gpu1
+[09-18 22:45:26] END   ppo Ax_donor_g4_diam_angle_blue rc=0
+[RESULT] arm=Ax_donor_g4_diam_angle_blue  v1成功率 57.8% 首次成功步 198  回报 mean=130.6  std=91.7  满分=375  区内=0.310  末100步: xe=10.9px de=1.682m 区内=0.552 |a|=0.118
+[09-18 22:53:59] END   eval Ax_donor_g4_diam_angle_blue
+[09-18 22:53:59] === gpu0:Ax 两条完成 ===
+[09-18 23:03:31] END   ppo Aw_donor_g4_diam_angle_blue rc=0
+[RESULT] arm=Aw_donor_g4_diam_angle_blue  v1成功率 10.9% 首次成功步 225  回报 mean=58.7  std=56.0  满分=375  区内=0.052  末100步: xe=20.4px de=3.061m 区内=0.093 |a|=0.088
+[09-18 23:12:31] END   eval Aw_donor_g4_diam_angle_blue
+[09-18 23:12:31] === gpu1:Aw 两条完成 ===
+[09-18 23:12:31] === 机制拆分的 PPO 行为确认全部完成 ===

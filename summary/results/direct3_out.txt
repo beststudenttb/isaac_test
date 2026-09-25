@@ -1,0 +1,31 @@
+init 参考统计完成
+base        init  ok
+d_red_ball  init  ok
+d_red_cube  init  ok
+d_green     init  ok
+d_none      init  ok
+A 参考统计完成
+base        A     ok
+d_red_ball  A     ok
+d_red_cube  A     ok
+d_green     A     ok
+d_none      A     ok
+V 参考统计完成
+base        V     ok
+d_red_ball  V     ok
+d_red_cube  V     ok
+d_green     V     ok
+d_none      V     ok
+R 参考统计完成
+base        R     ok
+d_red_ball  R     ok
+d_red_cube  R     ok
+d_green     R     ok
+d_none      R     ok
+sup 参考统计完成
+base        sup   ok
+d_red_ball  sup   ok
+d_red_cube  sup   ok
+d_green     sup   ok
+d_none      sup   ok
+[DONE] -> figs/direct_contrib_v3.png

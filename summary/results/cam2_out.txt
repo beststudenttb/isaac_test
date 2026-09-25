@@ -1,0 +1,15 @@
+layercam_distract.png base 行完成
+layercam_distract.png d_red_ball 行完成
+layercam_distract.png d_red_cube 行完成
+layercam_distract.png d_red_cone 行完成
+layercam_distract.png d_orange 行完成
+layercam_distract.png d_green 行完成
+layercam_distract.png d_white 行完成
+layercam_distract.png d_none 行完成
+-> figs/layercam_distract.png
+rise_distract.png base 行完成
+rise_distract.png d_red_ball 行完成
+rise_distract.png d_red_cube 行完成
+rise_distract.png d_none 行完成
+-> figs/rise_distract.png
+[DONE]

@@ -6,6 +6,7 @@
 
 - 每次上下文压缩、恢复或摘要接续后，先重读 `summary/agent_rule.md` 及各自私有规则，再继续实质性工作，不凭被压缩的摘要臆断规则。
 - 重读规则后，再读 `summary/readme.md` 和当日总结 `summary/yyyy_mm_dd_{device}.md`；文件不存在则跳过。
+- （2026-09-25 起）新会话或长会话接续时，按 `summary/REORIENT.md` 重建状态：`PROJECT.md` → `CURRENT_STATE.md` → `ACTIVE_PLAN.md` → `HANDOFF.md`，并以仓库产物为准核对。
 
 ## 1. 协作基本
 

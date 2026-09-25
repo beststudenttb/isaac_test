@@ -1,0 +1,11 @@
+[09-14 13:43:48] === 补种子开始:轮3(8) 轮3b(4) 轮4(15) 轮5(15) ===
+[09-14 13:43:48] START ppo R_donor_s3_wk_xyd gpu0
+[09-14 13:43:48] START ppo R_donor_s3_wk_diam gpu1
+[09-14 16:25:18] END   ppo R_donor_s3_wk_xyd rc=0
+[RESULT] arm=R_donor_s3_wk_xyd  v1成功率 31.2% 首次成功步 198  回报 mean=83.9  std=93.8  满分=375  区内=0.165  末100步: xe=15.4px de=2.668m 区内=0.293 |a|=0.441
+[09-14 16:29:18] END   ppo R_donor_s3_wk_diam rc=0
+[RESULT] arm=R_donor_s3_wk_diam  v1成功率 78.1% 首次成功步 265  回报 mean=172.2  std=80.2  满分=375  区内=0.442  末100步: xe=6.3px de=0.905m 区内=0.805 |a|=0.105
+[09-14 16:40:15] END   eval R_donor_s3_wk_xyd
+[09-14 16:40:15] START ppo R_donor_s3_wk_bbox gpu0
+[09-14 16:46:44] END   eval R_donor_s3_wk_diam
+[09-14 16:46:44] START ppo A_donor_s3_wk_diam gpu1

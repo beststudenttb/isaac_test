@@ -1,0 +1,55 @@
+== ang == teacher 观测 2 维  held 2500 帧
+表征             R²(T|z)线性 R²(T|z)MLP | z 的方差被解释掉多少:      T    T+蓝球     状态+蓝球     残差
+init               0.763      0.824 |                       0.456   0.759     0.756  0.244
+A                  0.986      0.974 |                       0.992   0.991     0.990  0.010
+V                  0.973      0.972 |                       0.991   0.990     0.989  0.011
+R                  0.959      0.966 |                       0.993   0.992     0.990  0.010
+sup                0.993      0.985 |                       0.988   0.985     0.985  0.015
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+teacher隐2          0.998      0.993 |                       1.000   1.000     0.999  0.001
+== xd == teacher 观测 2 维  held 2500 帧
+表征             R²(T|z)线性 R²(T|z)MLP | z 的方差被解释掉多少:      T    T+蓝球     状态+蓝球     残差
+init               0.820      0.891 |                       0.474   0.779     0.782  0.218
+A                  0.984      0.993 |                       0.996   0.996     0.996  0.004
+V                  0.993      0.995 |                       0.997   0.996     0.996  0.004
+R                  0.973      0.991 |                       0.996   0.995     0.994  0.006
+sup                0.995      0.995 |                       0.993   0.993     0.993  0.007
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+teacher隐2          0.999      0.999 |                       1.000   1.000     1.000  0.000
+== xyd == teacher 观测 4 维  held 2500 帧
+表征             R²(T|z)线性 R²(T|z)MLP | z 的方差被解释掉多少:      T    T+蓝球     状态+蓝球     残差
+init               0.806      0.894 |                       0.451   0.765     0.761  0.239
+A                  0.962      0.952 |                       0.992   0.991     0.986  0.014
+V                  0.965      0.971 |                       0.990   0.986     0.989  0.011
+R                  0.972      0.979 |                       0.995   0.995     0.993  0.007
+sup                0.990      0.994 |                       0.990   0.989     0.987  0.013
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+teacher隐2          0.999      0.999 |                       1.000   0.999     0.999  0.001
+== diam == teacher 观测 2 维  held 2500 帧
+表征             R²(T|z)线性 R²(T|z)MLP | z 的方差被解释掉多少:      T    T+蓝球     状态+蓝球     残差
+init               0.519      0.648 |                       0.461   0.767     0.768  0.232
+A                  0.970      0.946 |                       0.993   0.993     0.991  0.009
+V                  0.923      0.886 |                       0.991   0.990     0.991  0.009
+R                  0.908      0.933 |                       0.993   0.991     0.987  0.013
+sup                0.962      0.931 |                       0.972   0.971     0.970  0.030
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+teacher隐2          0.998      0.995 |                       0.990   0.999     0.999  0.001
+== bbox == teacher 观测 4 维  held 2500 帧
+表征             R²(T|z)线性 R²(T|z)MLP | z 的方差被解释掉多少:      T    T+蓝球     状态+蓝球     残差
+init               0.836      0.862 |                       0.470   0.769     0.760  0.240
+A                  0.985      0.980 |                       0.991   0.991     0.988  0.012
+V                  0.966      0.952 |                       0.993   0.993     0.993  0.007
+R                  0.945      0.951 |                       0.994   0.994     0.992  0.008
+sup                0.993      0.980 |                       0.984   0.983     0.985  0.015
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+teacher隐2          1.000      0.994 |                       1.000   0.999     0.998  0.002

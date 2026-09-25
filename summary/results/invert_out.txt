@@ -1,0 +1,76 @@
+  init / base
+    step    0 loss 0.0350
+    step  300 loss 0.0004
+    step  600 loss 0.0003
+    step  900 loss 0.0002
+  init / d_red_ball
+    step    0 loss 0.0344
+    step  300 loss 0.0004
+    step  600 loss 0.0003
+    step  900 loss 0.0002
+  init / d_none
+    step    0 loss 0.0263
+    step  300 loss 0.0004
+    step  600 loss 0.0003
+    step  900 loss 0.0002
+  A / base
+    step    0 loss 0.0193
+    step  300 loss 0.0003
+    step  600 loss 0.0002
+    step  900 loss 0.0003
+  A / d_red_ball
+    step    0 loss 0.0283
+    step  300 loss 0.0003
+    step  600 loss 0.0002
+    step  900 loss 0.0012
+  A / d_none
+    step    0 loss 0.0188
+    step  300 loss 0.0003
+    step  600 loss 0.0002
+    step  900 loss 0.0004
+  V / base
+    step    0 loss 0.0339
+    step  300 loss 0.0004
+    step  600 loss 0.0003
+    step  900 loss 0.0002
+  V / d_red_ball
+    step    0 loss 0.0826
+    step  300 loss 0.0005
+    step  600 loss 0.0004
+    step  900 loss 0.0002
+  V / d_none
+    step    0 loss 0.0267
+    step  300 loss 0.0003
+    step  600 loss 0.0002
+    step  900 loss 0.0003
+  R / base
+    step    0 loss 0.0027
+    step  300 loss 0.0003
+    step  600 loss 0.0002
+    step  900 loss 0.0008
+  R / d_red_ball
+    step    0 loss 0.0030
+    step  300 loss 0.0003
+    step  600 loss 0.0002
+    step  900 loss 0.0001
+  R / d_none
+    step    0 loss 0.0021
+    step  300 loss 0.0003
+    step  600 loss 0.0002
+    step  900 loss 0.0002
+  sup / base
+    step    0 loss 0.0117
+    step  300 loss 0.0001
+    step  600 loss 0.0003
+    step  900 loss 0.0000
+  sup / d_red_ball
+    step    0 loss 0.0160
+    step  300 loss 0.0001
+    step  600 loss 0.0001
+    step  900 loss 0.0000
+  sup / d_none
+    step    0 loss 0.0119
+    step  300 loss 0.0001
+    step  600 loss 0.0001
+    step  900 loss 0.0000
+[DONE] -> figs/inversion.png

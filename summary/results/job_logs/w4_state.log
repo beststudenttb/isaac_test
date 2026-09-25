@@ -1,0 +1,114 @@
+[09-18 21:58:58] === 4 物体批次调度器启动:teacher=models/rl/teacher_score_g4_diam_angle_s2/last.zip ===
+[09-18 21:58:58] 队列 26 条
+[09-18 23:12:59] worker gpu0:上一条链已结束,开始消费队列
+[09-18 23:12:59] worker gpu1:上一条链已结束,开始消费队列
+[09-18 23:12:59] START collect gpu0 (4 物体场景,teacher 追红球)
+[09-18 23:23:03] END   collect rc=0
+[09-18 23:23:03] START stage1 gpu0 (A/V/R/sup 四臂 + init)
+[09-18 23:47:50] END   stage1 rc=0
+[09-18 23:47:50] START ppo A_donor_w4_s0 gpu0 (槽位 0)
+[09-18 23:47:59] START ppo A_donor_w4_s1 gpu1 (槽位 1)
+[09-18 23:47:59] REAP gpu1 残留 679111
+[09-19 02:30:02] END   ppo A_donor_w4_s0 rc=0
+[RESULT] arm=A_donor_w4_s0  v1成功率 89.1% 首次成功步 157  回报 mean=194.9  std=78.8  满分=375  区内=0.574  末100步: xe=4.8px de=0.414m 区内=0.840 |a|=0.081
+[09-19 02:33:24] END   ppo A_donor_w4_s1 rc=0
+[RESULT] arm=A_donor_w4_s1  v1成功率 26.6% 首次成功步 219  回报 mean=91.2  std=76.4  满分=375  区内=0.150  末100步: xe=16.2px de=2.271m 区内=0.276 |a|=0.129
+[09-19 02:44:56] END   eval A_donor_w4_s0
+[09-19 02:44:56] START ppo A_donor_w4_s2 gpu0 (槽位 2)
+[09-19 02:56:01] REAP gpu1 残留 744140
+[09-19 03:02:03] END   eval A_donor_w4_s1
+[09-19 03:02:03] START ppo A_donor_w4_s3 gpu1 (槽位 3)
+[09-19 05:25:21] END   ppo A_donor_w4_s2 rc=0
+[RESULT] arm=A_donor_w4_s2  v1成功率 0.0% 首次成功步 nan  回报 mean=38.6  std=25.8  满分=375  区内=0.000  末100步: xe=23.0px de=3.587m 区内=0.000 |a|=0.033
+[09-19 05:37:12] END   eval A_donor_w4_s2
+[09-19 05:37:12] START ppo init_w4_s0 gpu0 (槽位 0)
+[09-19 05:45:26] END   ppo A_donor_w4_s3 rc=0
+[RESULT] arm=A_donor_w4_s3  v1成功率 0.0% 首次成功步 nan  回报 mean=40.8  std=34.8  满分=375  区内=0.004  末100步: xe=24.4px de=3.528m 区内=0.000 |a|=0.066
+[09-19 05:57:21] END   eval A_donor_w4_s3
+[09-19 05:57:21] START ppo init_w4_s1 gpu1 (槽位 1)
+[09-19 08:18:47] END   ppo init_w4_s0 rc=0
+[RESULT] arm=init_w4_s0  v1成功率 35.9% 首次成功步 181  回报 mean=103.0  std=90.3  满分=375  区内=0.206  末100步: xe=17.9px de=2.197m 区内=0.332 |a|=0.088
+[09-19 08:30:41] END   eval init_w4_s0
+[09-19 08:30:41] START ppo init_w4_s2 gpu0 (槽位 2)
+[09-19 08:41:38] END   ppo init_w4_s1 rc=0
+[RESULT] arm=init_w4_s1  v1成功率 76.6% 首次成功步 188  回报 mean=148.7  std=80.1  满分=375  区内=0.414  末100步: xe=8.0px de=1.047m 区内=0.706 |a|=0.103
+[09-19 08:53:32] END   eval init_w4_s1
+[09-19 08:53:32] START ppo init_w4_s3 gpu1 (槽位 3)
+[09-19 11:12:17] END   ppo init_w4_s2 rc=0
+[RESULT] arm=init_w4_s2  v1成功率 26.6% 首次成功步 222  回报 mean=71.5  std=79.2  满分=375  区内=0.128  末100步: xe=23.0px de=3.133m 区内=0.233 |a|=0.147
+[09-19 11:24:12] END   eval init_w4_s2
+[09-19 11:24:12] START ppo R_donor_w4_s0 gpu0 (槽位 0)
+[09-19 11:37:54] END   ppo init_w4_s3 rc=0
+[RESULT] arm=init_w4_s3  v1成功率 68.8% 首次成功步 202  回报 mean=147.0  std=97.7  满分=375  区内=0.362  末100步: xe=8.8px de=1.298m 区内=0.628 |a|=0.097
+[09-19 11:49:51] END   eval init_w4_s3
+[09-19 11:49:51] START ppo R_donor_w4_s1 gpu1 (槽位 1)
+[09-19 14:06:59] END   ppo R_donor_w4_s0 rc=0
+[RESULT] arm=R_donor_w4_s0  v1成功率 92.2% 首次成功步 148  回报 mean=229.7  std=83.9  满分=375  区内=0.635  末100步: xe=3.2px de=0.382m 区内=0.891 |a|=0.075
+[09-19 14:18:51] END   eval R_donor_w4_s0
+[09-19 14:18:51] START ppo R_donor_w4_s2 gpu0 (槽位 2)
+[09-19 14:35:16] END   ppo R_donor_w4_s1 rc=0
+[RESULT] arm=R_donor_w4_s1  v1成功率 75.0% 首次成功步 187  回报 mean=165.2  std=97.0  满分=375  区内=0.427  末100步: xe=7.1px de=1.046m 区内=0.717 |a|=0.103
+[09-19 14:47:11] END   eval R_donor_w4_s1
+[09-19 14:47:11] START ppo R_donor_w4_s3 gpu1 (槽位 3)
+[09-19 17:01:01] END   ppo R_donor_w4_s2 rc=0
+[RESULT] arm=R_donor_w4_s2  v1成功率 10.9% 首次成功步 244  回报 mean=53.9  std=58.3  满分=375  区内=0.047  末100步: xe=24.5px de=3.288m 区内=0.094 |a|=0.087
+[09-19 17:12:55] END   eval R_donor_w4_s2
+[09-19 17:12:55] START ppo V_donor_w4_s0 gpu0 (槽位 0)
+[09-19 17:31:43] END   ppo R_donor_w4_s3 rc=0
+[RESULT] arm=R_donor_w4_s3  v1成功率 46.9% 首次成功步 186  回报 mean=110.5  std=94.5  满分=375  区内=0.267  末100步: xe=14.1px de=2.206m 区内=0.464 |a|=0.119
+[09-19 17:43:41] END   eval R_donor_w4_s3
+[09-19 17:43:41] START ppo V_donor_w4_s1 gpu1 (槽位 1)
+[09-19 19:55:28] END   ppo V_donor_w4_s0 rc=0
+[RESULT] arm=V_donor_w4_s0  v1成功率 90.6% 首次成功步 135  回报 mean=207.5  std=77.0  满分=375  区内=0.637  末100步: xe=4.0px de=0.513m 区内=0.879 |a|=0.061
+[09-19 20:07:23] END   eval V_donor_w4_s0
+[09-19 20:07:23] START ppo V_donor_w4_s2 gpu0 (槽位 2)
+[09-19 20:28:36] END   ppo V_donor_w4_s1 rc=0
+[RESULT] arm=V_donor_w4_s1  v1成功率 43.8% 首次成功步 222  回报 mean=116.1  std=83.1  满分=375  区内=0.205  末100步: xe=10.6px de=1.627m 区内=0.384 |a|=0.140
+[09-19 20:40:32] END   eval V_donor_w4_s1
+[09-19 20:40:32] START ppo V_donor_w4_s3 gpu1 (槽位 3)
+[09-19 22:48:54] END   ppo V_donor_w4_s2 rc=0
+[RESULT] arm=V_donor_w4_s2  v1成功率 0.0% 首次成功步 nan  回报 mean=39.1  std=26.1  满分=375  区内=0.000  末100步: xe=22.4px de=3.593m 区内=0.000 |a|=0.039
+[09-19 23:00:43] END   eval V_donor_w4_s2
+[09-19 23:00:43] START ppo V_donor_s2_w4_s0 gpu0 (槽位 0)
+[09-19 23:24:19] END   ppo V_donor_w4_s3 rc=0
+[RESULT] arm=V_donor_w4_s3  v1成功率 6.2% 首次成功步 174  回报 mean=47.9  std=57.7  满分=375  区内=0.042  末100步: xe=25.8px de=3.827m 区内=0.071 |a|=0.112
+[09-19 23:36:14] END   eval V_donor_w4_s3
+[09-19 23:36:14] START ppo V_donor_s2_w4_s1 gpu1 (槽位 1)
+[09-20 01:43:05] END   ppo V_donor_s2_w4_s0 rc=0
+[RESULT] arm=V_donor_s2_w4_s0  v1成功率 93.8% 首次成功步 121  回报 mean=214.7  std=70.7  满分=375  区内=0.685  末100步: xe=3.5px de=0.555m 区内=0.919 |a|=0.058
+[09-20 01:55:00] END   eval V_donor_s2_w4_s0
+[09-20 01:55:00] START ppo V_donor_s2_w4_s2 gpu0 (槽位 2)
+[09-20 02:20:42] END   ppo V_donor_s2_w4_s1 rc=0
+[RESULT] arm=V_donor_s2_w4_s1  v1成功率 43.8% 首次成功步 219  回报 mean=119.5  std=80.2  满分=375  区内=0.220  末100步: xe=9.9px de=1.395m 区内=0.387 |a|=0.121
+[09-20 02:32:42] END   eval V_donor_s2_w4_s1
+[09-20 02:32:42] START ppo V_donor_s2_w4_s3 gpu1 (槽位 3)
+[09-20 04:35:38] END   ppo V_donor_s2_w4_s2 rc=0
+[RESULT] arm=V_donor_s2_w4_s2  v1成功率 0.0% 首次成功步 nan  回报 mean=38.6  std=25.9  满分=375  区内=0.000  末100步: xe=22.5px de=3.627m 区内=0.000 |a|=0.028
+[09-20 04:54:06] REAP gpu0 残留 1281545
+[09-20 05:02:06] END   eval V_donor_s2_w4_s2
+[09-20 05:02:06] START ppo sup_donor_w4_s0 gpu0 (槽位 0)
+[09-20 05:15:10] END   ppo V_donor_s2_w4_s3 rc=0
+[RESULT] arm=V_donor_s2_w4_s3  v1成功率 1.6% 首次成功步 207  回报 mean=43.7  std=42.4  满分=375  区内=0.013  末100步: xe=24.5px de=3.702m 区内=0.023 |a|=0.095
+[09-20 05:27:09] END   eval V_donor_s2_w4_s3
+[09-20 05:27:09] START ppo sup_donor_w4_s1 gpu1 (槽位 1)
+[09-20 07:43:53] END   ppo sup_donor_w4_s0 rc=0
+[RESULT] arm=sup_donor_w4_s0  v1成功率 90.6% 首次成功步 116  回报 mean=215.8  std=71.4  满分=375  区内=0.685  末100步: xe=4.4px de=0.649m 区内=0.888 |a|=0.054
+[09-20 07:55:45] END   eval sup_donor_w4_s0
+[09-20 07:55:45] START ppo sup_donor_w4_s2 gpu0 (槽位 2)
+[09-20 08:11:06] END   ppo sup_donor_w4_s1 rc=0
+[RESULT] arm=sup_donor_w4_s1  v1成功率 20.3% 首次成功步 225  回报 mean=86.7  std=67.7  满分=375  区内=0.112  末100步: xe=16.2px de=2.304m 区内=0.187 |a|=0.098
+[09-20 08:23:02] END   eval sup_donor_w4_s1
+[09-20 08:23:02] START ppo sup_donor_w4_s3 gpu1 (槽位 3)
+[09-20 10:36:26] END   ppo sup_donor_w4_s2 rc=0
+[RESULT] arm=sup_donor_w4_s2  v1成功率 0.0% 首次成功步 nan  回报 mean=39.5  std=31.2  满分=375  区内=0.002  末100步: xe=28.0px de=3.523m 区内=0.006 |a|=0.086
+[09-20 10:48:19] END   eval sup_donor_w4_s2
+[09-20 11:06:27] END   ppo sup_donor_w4_s3 rc=0
+[RESULT] arm=sup_donor_w4_s3  v1成功率 0.0% 首次成功步 nan  回报 mean=36.6  std=37.0  满分=375  区内=0.005  末100步: xe=28.0px de=4.042m 区内=0.004 |a|=0.095
+[09-20 11:18:28] END   eval sup_donor_w4_s3
+[09-20 11:18:28] worker gpu1:队列已排空(26/26),退出
+[09-20 11:18:28] worker gpu1 退出
+[09-20 11:19:20] worker gpu0:队列已排空(26/26),退出
+[09-20 11:19:20] worker gpu0 退出
+[09-20 11:19:20] === 4 物体批次全部结束 ===
+[09-20 11:24:37] === 队列已排空,开始 4 物体受控渲染(gpu0)===
+[09-20 11:51:06] === 受控渲染 rc=0 帧数=2560 ===

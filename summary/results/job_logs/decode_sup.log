@@ -1,0 +1,96 @@
+[3gH    H    H    H    H    H    H    H    H    H    H    H    H    H    H    H    H    H    H    H   [INFO] Using python from: /home/tb/miniconda3/envs/isaac/bin/python
+Loading user config located at: '/home/tb/miniconda3/envs/isaac/lib/python3.11/site-packages/isaacsim/kit/data/Kit/Isaac-Sim/5.1/user.config.json'
+[Info] [carb] Logging to file: /home/tb/miniconda3/envs/isaac/lib/python3.11/site-packages/isaacsim/kit/logs/Kit/Isaac-Sim/5.1/kit_20260916_155102.log
+2026-09-16T06:51:02Z [90ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2026-09-16T06:51:02Z [90ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.5]) (impl: carb.windowing-glfw.plugin)
+2026-09-16T06:51:02Z [100ms] [Warning] [omni.platforminfo.plugin] failed to open the default display.  Can't verify X Server version.
+2026-09-16T06:51:02Z [100ms] [Warning] [carb.cudainterop.plugin] CUDA_VISIBLE_DEVICES environment variable is set.
+2026-09-16T06:51:02Z [100ms] [Warning] [carb.cudainterop.plugin] Note CUDA device enumeration and Omniverse device enumeration are different.
+2026-09-16T06:51:02Z [100ms] [Warning] [carb.cudainterop.plugin] Setting CUDA_VISIBLE_DEVICES can lead to undesired behavior or crashes.
+2026-09-16T06:51:02Z [261ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2026-09-16T06:51:02Z [261ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.5]) (impl: carb.windowing-glfw.plugin)
+2026-09-16T06:51:02Z [463ms] [Warning] [gpu.foundation.plugin] Skipping NVIDIA GPU due CUDA being in bad state: NVIDIA GeForce RTX 4070 Ti
+2026-09-16T06:51:02Z [463ms] [Warning] [gpu.foundation.plugin] Please restart your system if CUDA is known to work in your system.
+2026-09-16T06:51:02Z [463ms] [Warning] [gpu.foundation.plugin] Skipping NVIDIA GPU due CUDA being in bad state: NVIDIA GeForce RTX 4070 Ti
+2026-09-16T06:51:02Z [463ms] [Warning] [gpu.foundation.plugin] Please restart your system if CUDA is known to work in your system.
+
+|---------------------------------------------------------------------------------------------|
+| Driver Version: 580.173.02    | Graphics API: Vulkan
+|=============================================================================================|
+| GPU | Name                             | Active | LDA | GPU Memory | Vendor-ID | LUID       |
+|     |                                  |        |     |            | Device-ID | UUID       |
+|     |                                  |        |     |            | Bus-ID    |            |
+|---------------------------------------------------------------------------------------------|
+| 0   | NVIDIA GeForce RTX 4070 Ti       |        |     | 12282   MB | 10de      | 0          |
+|     |                                  |        |     |            | 2782      | 53dfa558.. |
+|     |                                  |        |     |            | 1         |            |
+|---------------------------------------------------------------------------------------------|
+| 1   | NVIDIA GeForce RTX 4070 Ti       | Yes: 0 |     | 12282   MB | 10de      | 0          |
+|     |                                  |        |     |            | 2782      | a08141fd.. |
+|     |                                  |        |     |            | 7         |            |
+|=============================================================================================|
+| OS: 24.04.4 LTS (Noble Numbat) ubuntu, Version: 24.04.4, Kernel: 7.0.0-28-generic
+| Processor: 13th Gen Intel(R) Core(TM) i9-13900K
+| Bare Metal Cores: 24 | Bare Metal Logical Cores: 48
+| Available Cores:  32 
+|---------------------------------------------------------------------------------------------|
+| Total Memory (MB): 128557 | Free Memory: 114884
+| Total Page/Swap (MB): 8191 | Free Page/Swap: 8164
+|---------------------------------------------------------------------------------------------|
+2026-09-16T06:51:02Z [665ms] [Warning] [gpu.foundation.plugin] CPU performance profile is set to powersave. This profile sets the CPU to the lowest frequency reducing performance.
+2026-09-16T06:51:02Z [674ms] [Warning] [gpu.foundation.plugin] PCIe link width current (4) and maximum (16) for device 1 don't match.
+[INFO][AppLauncher]: Input keyword argument `livestream=0` has overridden the environment variable `LIVESTREAM=0`.
+[INFO][AppLauncher]: Using device: cuda:0
+[INFO][AppLauncher]: Loading experience file: /home/tb/Downloads/isaac_test/IsaacLab/apps/isaaclab.python.headless.rendering.kit
+
+[36m======================================================================================[0m
+[36m[1m[INFO][IsaacLab]: Logging to file: /tmp/isaaclab/logs/isaaclab_2026-09-16_15-51-08.log[0m
+[36m======================================================================================[0m
+
+[33m15:51:08 [simulation_context.py] WARNING: Large simulation step size (> 0.0333 seconds) is not recommended without enabling stabilization. Consider setting the `enable_stabilization` flag to True in the PhysxCfg, or reducing the simulation step size if you run into physics issues.[0m
+[33m15:51:08 [simulation_context.py] WARNING: The `enable_external_forces_every_iteration` parameter in the PhysxCfg is set to False. If you are experiencing noisy velocities, consider enabling this flag. You may need to slightly increase the number of velocity iterations (setting it to 1 or 2 rather than 0), together with this flag, to improve the accuracy of velocity updates.[0m
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+/home/tb/miniconda3/envs/isaac/lib/python3.11/site-packages/stable_baselines3/common/on_policy_algorithm.py:150: UserWarning: You are trying to run PPO on the GPU, but it is primarily intended to run on the CPU when not using a CNN policy (you are using ActorCriticPolicy which should be a MlpPolicy). See https://github.com/DLR-RM/stable-baselines3/issues/1245 for more info. You can pass `device='cpu'` or `export CUDA_VISIBLE_DEVICES=` to force using the CPU.Note: The model will train, but the GPU utilization will be poor and the training might take longer than on CPU.
+  warnings.warn(
+[INFO]: Base environment:
+	Environment device    : cuda:0
+	Environment seed      : 123
+	Physics step-size     : 0.04
+	Rendering step-size   : 0.04
+	Environment step-size : 0.04
+[INFO]: Time taken for scene creation : 0.098560 seconds
+[INFO]: Scene manager:  <class InteractiveScene>
+	Number of environments: 64
+	Environment spacing   : 16.0
+	Source prim name      : /World/envs/env_0
+	Global prim paths     : []
+	Replicate physics     : True
+[INFO]: Starting the simulation. This may take a few seconds. Please wait...
+[INFO]: Time taken for simulation start : 0.591041 seconds
+[INFO]: Completed setting up the environment...
+[DECODE] 表征=sup 解码头 -> teacher 观测 -> teacher 策略(models/rl/teacher_score_g4_diam_angle_s2/last.zip)
+[DECODE] arm=sup_g4_diam_angle  v1成功率 100.0% 首次成功步 104  回报 mean=281.7  std=34.5  满分=375  区内=0.790  末100步: xe=0.7px de=0.106m 区内=0.980 |a|=0.055
+2026-09-16T06:51:03Z [1,087ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2026-09-16T06:51:03Z [1,087ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.5]) (impl: carb.windowing-glfw.plugin)
+2026-09-16T06:51:03Z [1,099ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2026-09-16T06:51:03Z [1,099ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.5]) (impl: carb.windowing-glfw.plugin)
+2026-09-16T06:51:03Z [1,106ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2026-09-16T06:51:03Z [1,106ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.5]) (impl: carb.windowing-glfw.plugin)
+2026-09-16T06:51:03Z [1,113ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2026-09-16T06:51:03Z [1,113ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.5]) (impl: carb.windowing-glfw.plugin)
+2026-09-16T06:51:03Z [1,114ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2026-09-16T06:51:03Z [1,114ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.5]) (impl: carb.windowing-glfw.plugin)
+2026-09-16T06:51:03Z [1,115ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2026-09-16T06:51:03Z [1,115ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.5]) (impl: carb.windowing-glfw.plugin)
+2026-09-16T06:51:03Z [1,236ms] [Warning] [omni.log] Source: omni.hydra was already registered.
+2026-09-16T06:51:03Z [1,417ms] [Warning] [carb] Acquiring non optional plugin interface which is not listed as dependency: [omni::physx::IPhysxBenchmarks v1.0] (plugin: <default plugin>), by client: omni.physics.physx.plugin. Add it to CARB_PLUGIN_IMPL_DEPS() macro of a client.
+2026-09-16T06:51:03Z [1,432ms] [Warning] [omni.isaac.dynamic_control] omni.isaac.dynamic_control is deprecated as of Isaac Sim 4.5. No action is needed from end-users.
+2026-09-16T06:51:05Z [2,969ms] [Warning] [pxr.Semantics] pxr.Semantics is deprecated - please use Semantics instead
+2026-09-16T06:51:05Z [3,036ms] [Warning] [omni.graph.core.plugin] Found duplicate of category 'Replicator' - was 'Annotators', adding 'Fabric Reader'
+2026-09-16T06:51:05Z [3,036ms] [Warning] [omni.graph.core.plugin] Category 'Replicator' not accepted on node type 'omni.replicator.core.FabricReader' in extension 'omni.replicator.core'
+2026-09-16T06:51:05Z [3,037ms] [Warning] [omni.replicator.core.scripts.extension] No material configuration file, adding configuration to material settings directly.
+2026-09-16T06:51:06Z [3,928ms] [Warning] [omni.kvdb.plugin] Disabling key-value database because another kit process is locking it
+2026-09-16T06:51:07Z [5,381ms] [Warning] [omni.fabric.plugin] Warning: attribute viewportHandle not found for bucket id 7
+
